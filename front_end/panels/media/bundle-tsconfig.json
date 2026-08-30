@@ -1,0 +1,1 @@
+{"compilerOptions":{"composite":true,"outDir":".","baseUrl":".","rootDir":"../../../../../../front_end/panels/media"},"files":["../../../../../../front_end/panels/media/media.ts"],"references":[{"path":"./css_files-tsconfig.ref.json"},{"path":"./media-tsconfig.ref.json"}]}

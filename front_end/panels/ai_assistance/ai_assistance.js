@@ -1,0 +1,8157 @@
+var __defProp = Object.defineProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+
+// gen/front_end/panels/ai_assistance/AiAssistancePanel.js
+import "../../ui/kit/kit.js";
+import * as Common5 from "../../core/common/common.js";
+import * as Host5 from "../../core/host/host.js";
+import * as i18n17 from "../../core/i18n/i18n.js";
+import * as Platform5 from "../../core/platform/platform.js";
+import * as Root4 from "../../core/root/root.js";
+import * as SDK6 from "../../core/sdk/sdk.js";
+import * as AiAssistanceModel8 from "../../models/ai_assistance/ai_assistance.js";
+import * as Badges from "../../models/badges/badges.js";
+import * as Workspace4 from "../../models/workspace/workspace.js";
+import * as Buttons7 from "../../ui/components/buttons/buttons.js";
+import * as Snackbars4 from "../../ui/components/snackbars/snackbars.js";
+import * as UIHelpers2 from "../../ui/helpers/helpers.js";
+import * as UI9 from "../../ui/legacy/legacy.js";
+import * as Lit10 from "../../ui/lit/lit.js";
+import * as VisualLogging8 from "../../ui/visual_logging/visual_logging.js";
+import * as LighthousePanel2 from "../lighthouse/lighthouse.js";
+import * as NetworkForward2 from "../network/forward/forward.js";
+import * as NetworkPanel from "../network/network.js";
+import * as TimelinePanel2 from "../timeline/timeline.js";
+
+// gen/front_end/panels/ai_assistance/aiAssistancePanel.css.js
+var aiAssistancePanel_css_default = `/*
+ * Copyright 2024 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+.toolbar-container {
+  display: flex;
+  flex-wrap: wrap;
+  background-color: var(--sys-color-cdt-base-container);
+  border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+  flex: 0 0 auto;
+  justify-content: space-between;
+}
+
+.ai-assistance-view-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  overflow: hidden;
+
+  & .fill-panel {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  devtools-split-view {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.toolbar-feedback-link {
+  color: var(--sys-color-primary);
+  margin: 0 var(--sys-size-3);
+  height: auto;
+  font-size: var(--sys-typescale-body4-size);
+}
+
+/*# sourceURL=${import.meta.resolve("././aiAssistancePanel.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/AccessibilityAgentMarkdownRenderer.js
+import * as SDK from "../../core/sdk/sdk.js";
+import * as AiAssistanceModel2 from "../../models/ai_assistance/ai_assistance.js";
+import * as Lit2 from "../../ui/lit/lit.js";
+import * as PanelsCommon from "../common/common.js";
+
+// gen/front_end/panels/ai_assistance/components/MarkdownRendererWithCodeBlock.js
+import * as Common from "../../core/common/common.js";
+import * as Platform from "../../core/platform/platform.js";
+import * as AiAssistanceModel from "../../models/ai_assistance/ai_assistance.js";
+import * as Logs from "../../models/logs/logs.js";
+import * as MarkdownView from "../../ui/components/markdown_view/markdown_view.js";
+import * as Lit from "../../ui/lit/lit.js";
+var { html } = Lit;
+var MarkdownRendererWithCodeBlock = class extends MarkdownView.MarkdownView.MarkdownInsightRenderer {
+  #revealableLink(revealable, label) {
+    return html`<devtools-link @click=${(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void Common.Revealer.reveal(revealable);
+    }}>${Platform.StringUtilities.trimEndWithMaxLength(label, 100)}</devtools-link>`;
+  }
+  #renderLink(href, fallbackText) {
+    if (href.startsWith("#req-")) {
+      const request = Logs.NetworkLog.NetworkLog.instance().requests().find((req) => req.requestId() === href.substring(5));
+      if (request) {
+        return this.#revealableLink(request, request.url());
+      }
+      return html`${fallbackText}`;
+    }
+    if (href.startsWith("#file-")) {
+      const file = AiAssistanceModel.ContextSelectionAgent.ContextSelectionAgent.getUISourceCodes().find((file2) => AiAssistanceModel.ContextSelectionAgent.ContextSelectionAgent.uiSourceCodeId.get(file2) === Number(href.substring(6)));
+      if (file) {
+        return this.#revealableLink(file, file.name());
+      }
+      return html`${fallbackText}`;
+    }
+    return null;
+  }
+  templateForToken(token) {
+    if (token.type === "link") {
+      const link3 = this.#renderLink(token.href, token.text);
+      if (link3) {
+        return link3;
+      }
+    }
+    if (token.type === "code") {
+      const lines = token.text.split("\n");
+      if (lines[0]?.trim() === "css") {
+        token.lang = "css";
+        token.text = lines.slice(1).join("\n");
+      }
+    }
+    if (token.type === "codespan") {
+      const matches = token.text.match(/^\[(.*)\]\((.+)\)$/);
+      if (matches?.[2]) {
+        const link3 = this.#renderLink(matches[2], matches[1]);
+        if (link3) {
+          return link3;
+        }
+      }
+    }
+    return super.templateForToken(token);
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/AccessibilityAgentMarkdownRenderer.js
+var { html: html2 } = Lit2.StaticHtml;
+var { until } = Lit2.Directives;
+var AccessibilityAgentMarkdownRenderer = class extends MarkdownRendererWithCodeBlock {
+  mainDocumentURL;
+  constructor(mainDocumentURL = "") {
+    super();
+    this.mainDocumentURL = mainDocumentURL;
+  }
+  #isSameOrigin(node) {
+    const nodeDocumentURL = node.ownerDocument?.documentURL ?? "";
+    return AiAssistanceModel2.AiUtils.isSameOrigin(this.mainDocumentURL, nodeDocumentURL);
+  }
+  templateForToken(token) {
+    if (token.type === "link" && token.href.startsWith("#")) {
+      const parsed = this.#parseLink(token.href);
+      if (parsed) {
+        const resultPromise = parsed.type === "path" ? this.#linkifyPath(parsed.path, token.text) : this.#linkifyNode(parsed.nodeId, token.text);
+        return html2`<span>${until(resultPromise.then((node) => node || token.text), token.text)}</span>`;
+      }
+    }
+    return super.templateForToken(token);
+  }
+  /**
+   * Parses a link href to determine if it's a node ID or a DOM path.
+   *
+   * The AI agent is instructed to use #node-ID or #path-PATH, but
+   * sometimes it omits the prefixes, in which case we try to detect
+   * paths by looking for `#1,HTML` which is often how paths in LH
+   * start.
+   */
+  #parseLink(href) {
+    if (href.startsWith("#path-")) {
+      return { type: "path", path: href.replace("#path-", "") };
+    }
+    if (href.startsWith("#1,HTML")) {
+      return { type: "path", path: href.slice(1) };
+    }
+    let nodeIdStr = "";
+    if (href.startsWith("#node-")) {
+      nodeIdStr = href.replace("#node-", "");
+    } else if (href.startsWith("#")) {
+      nodeIdStr = href.slice(1);
+    }
+    if (nodeIdStr.trim() !== "") {
+      const nodeId = Number(nodeIdStr);
+      if (Number.isInteger(nodeId)) {
+        return { type: "node", nodeId };
+      }
+    }
+    return null;
+  }
+  /**
+   * Linkifies a node using its backend node ID.
+   */
+  async #linkifyNode(backendNodeId, label) {
+    if (backendNodeId === void 0) {
+      return;
+    }
+    const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const domModel = target?.model(SDK.DOMModel.DOMModel);
+    if (!domModel) {
+      return void 0;
+    }
+    const domNodesMap = await domModel.pushNodesByBackendIdsToFrontend(/* @__PURE__ */ new Set([backendNodeId]));
+    const node = domNodesMap?.get(backendNodeId);
+    if (!node) {
+      return;
+    }
+    if (!this.#isSameOrigin(node)) {
+      return;
+    }
+    const linkedNode = PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(node, { textContent: label });
+    return linkedNode;
+  }
+  /**
+   * Linkifies a node using its full DOM path (e.g. "1,HTML,1,BODY,...").
+   */
+  async #linkifyPath(path, label) {
+    const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    const domModel = target?.model(SDK.DOMModel.DOMModel);
+    if (!domModel) {
+      return void 0;
+    }
+    const nodeId = await domModel.pushNodeByPathToFrontend(path);
+    if (!nodeId) {
+      return;
+    }
+    const node = domModel.nodeForId(nodeId);
+    if (!node) {
+      return;
+    }
+    if (!this.#isSameOrigin(node)) {
+      return;
+    }
+    const linkedNode = PanelsCommon.DOMLinkifier.Linkifier.instance().linkify(node, { textContent: label });
+    return linkedNode;
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/AIv2MarkdownRenderer.js
+import * as Common2 from "../../core/common/common.js";
+import * as Platform2 from "../../core/platform/platform.js";
+import * as SDK2 from "../../core/sdk/sdk.js";
+import * as AiAssistanceModel3 from "../../models/ai_assistance/ai_assistance.js";
+import * as Logs2 from "../../models/logs/logs.js";
+import * as Trace from "../../models/trace/trace.js";
+import * as MarkdownView3 from "../../ui/components/markdown_view/markdown_view.js";
+import * as Lit3 from "../../ui/lit/lit.js";
+import * as PanelsCommon2 from "../common/common.js";
+var { html: html3 } = Lit3.StaticHtml;
+var { until: until2 } = Lit3.Directives;
+var AIv2MarkdownRenderer = class extends MarkdownView3.MarkdownView.MarkdownInsightRenderer {
+  options;
+  constructor(options = {}) {
+    super();
+    this.options = options;
+  }
+  #isSameOrigin(node) {
+    if (!this.options.mainDocumentURL) {
+      return true;
+    }
+    const nodeDocumentURL = node.ownerDocument?.documentURL ?? "";
+    return AiAssistanceModel3.AiUtils.isSameOrigin(this.options.mainDocumentURL, nodeDocumentURL);
+  }
+  #revealableLink(revealable, label) {
+    return html3`<devtools-link @click=${(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void Common2.Revealer.reveal(revealable);
+    }}>${Platform2.StringUtilities.trimEndWithMaxLength(label, 100)}</devtools-link>`;
+  }
+  #renderLink(href, text) {
+    const devtoolsLink = this.#renderDevToolsLink(href, text);
+    if (devtoolsLink) {
+      return devtoolsLink;
+    }
+    if (href.startsWith("#")) {
+      const parsed = this.#parseLink(href);
+      if (parsed) {
+        const resultPromise = parsed.type === "path" ? this.#linkifyPath(parsed.path, text) : this.#linkifyNode(parsed.nodeId, text);
+        return html3`<span>${until2(resultPromise.then((node) => node || text), text)}</span>`;
+      }
+      if (this.options.lookupTraceEvent) {
+        const event = this.options.lookupTraceEvent(href.slice(1));
+        if (event) {
+          let label = text;
+          let title = "";
+          if (Trace.Types.Events.isSyntheticNetworkRequest(event)) {
+            title = event.args.data.url;
+          } else {
+            label += ` (${event.name})`;
+          }
+          return html3`<a href="#" draggable=false .title=${title} @click=${(e) => {
+            e.stopPropagation();
+            void Common2.Revealer.reveal(new SDK2.TraceObject.RevealableEvent(event));
+          }}>${label}</a>`;
+        }
+      }
+    }
+    return null;
+  }
+  #renderDevToolsLink(href, fallbackText) {
+    if (href.startsWith("#req-")) {
+      const request = Logs2.NetworkLog.NetworkLog.instance().requests().find((req) => req.requestId() === href.substring(5));
+      if (request) {
+        return this.#revealableLink(request, request.url());
+      }
+      return html3`${fallbackText}`;
+    }
+    if (href.startsWith("#file-")) {
+      const file = AiAssistanceModel3.ListSources.ListSourcesTool.getUISourceCodes().find((file2) => AiAssistanceModel3.ListSources.ListSourcesTool.uiSourceCodeId.get(file2) === Number(href.substring(6)));
+      if (file) {
+        return this.#revealableLink(file, file.name());
+      }
+      return html3`${fallbackText}`;
+    }
+    return null;
+  }
+  #parseLink(href) {
+    if (href.startsWith("#path-")) {
+      return { type: "path", path: href.replace("#path-", "") };
+    }
+    if (href.startsWith("#1,HTML")) {
+      return { type: "path", path: href.slice(1) };
+    }
+    let nodeIdStr = "";
+    if (href.startsWith("#node-")) {
+      nodeIdStr = href.replace("#node-", "");
+    } else if (href.startsWith("#")) {
+      nodeIdStr = href.slice(1);
+    }
+    if (nodeIdStr.trim() !== "") {
+      const nodeId = Number(nodeIdStr);
+      if (Number.isInteger(nodeId)) {
+        return { type: "node", nodeId };
+      }
+    }
+    return null;
+  }
+  async #linkifyNode(backendNodeId, label) {
+    const target = SDK2.TargetManager.TargetManager.instance().primaryPageTarget();
+    const domModel = target?.model(SDK2.DOMModel.DOMModel);
+    if (!domModel) {
+      return void 0;
+    }
+    const domNodesMap = await domModel.pushNodesByBackendIdsToFrontend(/* @__PURE__ */ new Set([backendNodeId]));
+    const node = domNodesMap?.get(backendNodeId);
+    if (!node) {
+      return;
+    }
+    if (this.options.mainFrameId && node.frameId() !== this.options.mainFrameId) {
+      return;
+    }
+    if (!this.#isSameOrigin(node)) {
+      return;
+    }
+    const linkedNode = PanelsCommon2.DOMLinkifier.Linkifier.instance().linkify(node, { textContent: label });
+    return linkedNode;
+  }
+  async #linkifyPath(path, label) {
+    const target = SDK2.TargetManager.TargetManager.instance().primaryPageTarget();
+    const domModel = target?.model(SDK2.DOMModel.DOMModel);
+    if (!domModel) {
+      return void 0;
+    }
+    const nodeId = await domModel.pushNodeByPathToFrontend(path);
+    if (!nodeId) {
+      return;
+    }
+    const node = domModel.nodeForId(nodeId);
+    if (!node) {
+      return;
+    }
+    if (!this.#isSameOrigin(node)) {
+      return;
+    }
+    const linkedNode = PanelsCommon2.DOMLinkifier.Linkifier.instance().linkify(node, { textContent: label });
+    return linkedNode;
+  }
+  templateForToken(token) {
+    if (token.type === "link") {
+      const link3 = this.#renderLink(token.href, token.text);
+      if (link3) {
+        return link3;
+      }
+    }
+    if (token.type === "code") {
+      const lines = token.text.split("\n");
+      if (lines[0]?.trim() === "css") {
+        token.lang = "css";
+        token.text = lines.slice(1).join("\n");
+      }
+    }
+    if (token.type === "codespan") {
+      const matches = token.text.match(/^\[(.*)\]\((.+)\)$/);
+      if (matches?.[2]) {
+        const link3 = this.#renderLink(matches[2], matches[1]);
+        if (link3) {
+          return link3;
+        }
+      }
+    }
+    return super.templateForToken(token);
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/ChatView.js
+import "../../ui/components/spinners/spinners.js";
+import * as Host3 from "../../core/host/host.js";
+import * as i18n9 from "../../core/i18n/i18n.js";
+import * as AiAssistanceModel7 from "../../models/ai_assistance/ai_assistance.js";
+import * as Buttons5 from "../../ui/components/buttons/buttons.js";
+import * as UI5 from "../../ui/legacy/legacy.js";
+import { Directives as Directives6, html as html8, render as render5 } from "../../ui/lit/lit.js";
+
+// gen/front_end/panels/ai_assistance/components/ChatInput.js
+var ChatInput_exports = {};
+__export(ChatInput_exports, {
+  ChatInput: () => ChatInput,
+  DEFAULT_VIEW: () => DEFAULT_VIEW,
+  MAX_IMAGE_FILE_SIZE_BYTES: () => MAX_IMAGE_FILE_SIZE_BYTES
+});
+import "../../ui/components/tooltips/tooltips.js";
+import * as i18n from "../../core/i18n/i18n.js";
+import * as SDK3 from "../../core/sdk/sdk.js";
+import * as AiAssistanceModel4 from "../../models/ai_assistance/ai_assistance.js";
+import * as PanelsCommon3 from "../common/common.js";
+import * as PanelUtils from "../utils/utils.js";
+import * as Buttons from "../../ui/components/buttons/buttons.js";
+import * as Input from "../../ui/components/input/input.js";
+import * as Snackbars from "../../ui/components/snackbars/snackbars.js";
+import * as UI from "../../ui/legacy/legacy.js";
+import * as Lit4 from "../../ui/lit/lit.js";
+import * as VisualLogging from "../../ui/visual_logging/visual_logging.js";
+
+// gen/front_end/panels/ai_assistance/components/chatInput.css.js
+var chatInput_css_default = `/*
+ * Copyright 2025 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:host {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-form {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--sys-size-5) var(--sys-size-5) var(--sys-size-5);
+  max-width: var(--sys-size-36);
+  background-color: var(--sys-color-cdt-base-container);
+  width: 100%;
+}
+
+.chat-readonly-container {
+  display: flex;
+  width: 100%;
+  max-width: var(--sys-size-36);
+  justify-content: center;
+  align-items: center;
+  background-color: var(--sys-color-surface3);
+  font: var(--sys-typescale-body4-regular);
+  padding: var(--sys-size-5) 0;
+  border-radius: var(--sys-shape-corner-medium-small);
+  margin-bottom: var(--sys-size-5);
+  color: var(--sys-color-on-surface-subtle);
+}
+
+.chat-input-container {
+  width: 100%;
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+  border-radius: var(--sys-shape-corner-small);
+
+  &:focus-within {
+    outline: var(--sys-size-1) solid var(--sys-color-primary);
+    border-color: var(--sys-color-primary);
+  }
+
+  &.disabled {
+    background-color: var(--sys-color-state-disabled-container);
+    border-color: transparent;
+
+    & .chat-input-disclaimer {
+      border-color: var(--sys-color-state-disabled);
+    }
+  }
+
+  &.single-line-layout {
+    flex-direction: row;
+    justify-content: space-between;
+
+    .chat-input {
+      flex-shrink: 1;
+      padding: var(--sys-size-4);
+    }
+
+    .chat-input-actions {
+      flex-shrink: 0;
+      padding-block: 0;
+      align-items: flex-end;
+      padding-bottom: var(--sys-size-1);
+    }
+  }
+
+  & .image-input-container {
+    margin: var(--sys-size-3) var(--sys-size-4) 0;
+    max-width: 100%;
+    width: fit-content;
+    position: relative;
+
+    devtools-button {
+      position: absolute;
+      top: calc(-1 * var(--sys-size-2));
+      right: calc(-1 * var(--sys-size-3));
+      border-radius: var(--sys-shape-corner-full);
+      border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+      background-color: var(--sys-color-cdt-base-container);
+    }
+
+    img {
+      max-height: var(--sys-size-18);
+      max-width: 100%;
+      border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+      border-radius: var(--sys-shape-corner-small);
+    }
+
+    .loading {
+      margin: var(--sys-size-4) 0;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      height: var(--sys-size-18);
+      width: var(--sys-size-19);
+      background-color: var(--sys-color-surface3);
+      border-radius: var(--sys-shape-corner-small);
+      border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+
+      devtools-spinner {
+        color: var(--sys-color-state-disabled);
+      }
+    }
+  }
+
+  & .chat-input-disclaimer-container {
+    display: flex;
+    align-items: center;
+    padding-right: var(--sys-size-3);
+    flex-shrink: 0;
+  }
+
+  & .chat-input-disclaimer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font: var(--sys-typescale-body5-regular);
+    border-right: var(--sys-size-1) solid var(--sys-color-divider);
+    padding-right: var(--sys-size-5);
+
+    &.hide-divider {
+      border-right: none;
+    }
+  }
+
+  /*
+    Hide the inline disclaimer on narrow widths (< 400px) because space is limited
+    and the disclaimer is shown in the footer instead for this case.
+  */
+  @container --chat-ui-container (width < 400px) {
+    & .chat-input-disclaimer-container {
+      display: none;
+    }
+  }
+}
+
+.chat-input {
+  scrollbar-width: none;
+  field-sizing: content;
+  resize: none;
+  width: 100%;
+  max-height: 84px; /* 4 rows */
+  border: 0;
+  border-radius: var(--sys-shape-corner-small);
+  font: var(--sys-typescale-body4-regular);
+  line-height: 18px;
+  min-height: var(--sys-size-11);
+  color: var(--sys-color-on-surface);
+  background-color: var(--sys-color-cdt-base-container);
+  padding: var(--sys-size-4) var(--sys-size-4) var(--sys-size-3)
+    var(--sys-size-4);
+
+  &::placeholder {
+    opacity: 60%;
+  }
+
+  &:focus-visible {
+    outline: 0;
+  }
+
+  &:disabled {
+    color: var(--sys-color-state-disabled);
+    background-color: transparent;
+    border-color: transparent;
+
+    &::placeholder {
+      color: var(--sys-color-on-surface-subtle);
+      opacity: 100%;
+    }
+  }
+}
+
+.chat-input-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: var(--sys-size-4);
+  padding-right: var(--sys-size-2);
+  gap: var(--sys-size-6);
+  padding-bottom: var(--sys-size-2);
+
+  & .chat-input-actions-left {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  & .chat-input-actions-right {
+    flex-shrink: 0;
+    display: flex;
+
+    & .start-new-chat-button {
+      padding-bottom: var(--sys-size-2);
+      padding-right: var(--sys-size-3);
+    }
+  }
+}
+
+.chat-inline-button {
+  padding-left: 3px;
+}
+
+.select-element {
+  display: flex;
+  gap: var(--sys-size-3);
+  align-items: center;
+
+  .resource-link {
+    display: flex;
+    background-color: var(--sys-color-cdt-base-container);
+    align-items: center;
+    cursor: pointer;
+    padding: var(--sys-size-2) var(--sys-size-3);
+    font: var(--sys-typescale-body5-regular);
+    border: var(--sys-size-1) solid var(--sys-color-divider);
+    border-radius: var(--sys-shape-corner-extra-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /*
+      Allow the link/task item to shrink below its intrinsic minimum width in the flex container,
+      enabling text-overflow ellipsis to work correctly.
+    */
+    min-width: 0;
+    line-height: 1;
+
+    & .title {
+      vertical-align: middle;
+      /* Fixed italic text getting cut off */
+      padding-right: var(--sys-size-2);
+      font: var(--sys-typescale-body5-regular);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    & .remove-context,
+    & .add-context {
+      vertical-align: middle;
+    }
+
+    &:focus-visible {
+      outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+    }
+
+    devtools-icon,
+    devtools-file-source-icon {
+      display: inline-flex;
+      vertical-align: middle;
+      min-width: var(--sys-size-7);
+      min-height: var(--sys-size-7);
+    }
+
+    &.disabled {
+      border-style: dashed;
+      border-color: var(--sys-color-neutral-outline);
+      color: var(--sys-color-on-surface-light);
+
+      devtools-icon,
+      devtools-file-source-icon {
+        /* Override devtools-file-source-icon */
+        --override-file-source-icon-color: var(
+          --sys-color-on-surface-light-graphics
+        );
+        /* Some icons set their style attribute and we need to override it */
+        /* stylelint-disable-next-line declaration-no-important */
+        color: var(--sys-color-on-surface-light-graphics) !important;
+      }
+
+      .title {
+        color: var(--sys-color-on-surface-light);
+        font-style: italic;
+      }
+    }
+
+    /*
+      CSS styling for \\'network-override-marker\\' is similar to
+      https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/network/networkLogView.css;l=379.
+      There is a difference in \\'left\\' and \\'top\\' values to make sure
+      it is placed correctly for the network icon in assistance panel.
+    */
+    .network-override-marker {
+      position: relative;
+      float: left;
+    }
+
+    .network-override-marker::before {
+      content: var(--image-file-empty);
+      width: var(--sys-size-4);
+      height: var(--sys-size-4);
+      border-radius: 50%;
+      outline: var(--sys-size-1) solid var(--icon-gap-focus-selected);
+      left: 11px;
+      position: absolute;
+      top: 13px;
+      z-index: 1;
+      background-color: var(--sys-color-purple-bright);
+    }
+
+    .image.icon {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      vertical-align: middle;
+      margin-right: var(--sys-size-3);
+
+      img {
+        max-width: var(--sys-size-7);
+        max-height: var(--sys-size-7);
+      }
+    }
+  }
+}
+
+.link {
+  color: var(--text-link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+button.link {
+  border: none;
+  background: none;
+  font: inherit;
+
+  &:focus-visible {
+    outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+    outline-offset: 0;
+    border-radius: var(--sys-shape-corner-extra-small);
+  }
+}
+
+.floaty {
+  font: var(--sys-typescale-body4);
+  color: var(--sys-color-on-surface);
+  user-select: none;
+  padding: 0;
+  margin: 0;
+  list-style-type: none;
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-end;
+  gap: var(--sys-size-2);
+  margin-bottom: var(--sys-size-2);
+
+  li {
+    background: var(--sys-color-surface3);
+    border-radius: var(--sys-shape-corner-small);
+    border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+    padding: var(--sys-size-2) var(--sys-size-3);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--sys-size-2);
+    min-height: var(--sys-size-8);
+  }
+
+  .context-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--sys-size-2);
+  }
+
+  .open-floaty {
+    padding: 0;
+    border: none;
+
+    /* To align with other chips */
+    margin-bottom: var(--sys-size-1);
+  }
+}
+
+.chat-input-footer {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--sys-size-3);
+  font: var(--sys-typescale-body5-regular);
+  border-top: var(--sys-size-1) solid var(--sys-color-divider);
+  text-wrap: balance;
+  text-align: center;
+  width: 100%;
+
+  /*
+    The footer (for active conversations) is hidden by default on wider screens
+    because the disclaimer is shown inline within the chat input actions. Show it only on narrow widths (< 400px).
+  */
+  &:not(.is-read-only) {
+    display: none;
+    border: none;
+
+    @container --chat-ui-container (width < 400px) {
+      display: flex;
+    }
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/chatInput.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/ImageResize.js
+var ImageResize_exports = {};
+__export(ImageResize_exports, {
+  compress: () => compress,
+  setCompressImplementationForTest: () => setCompressImplementationForTest
+});
+var MAX_DIMENSION_PX = 1024;
+var compressImplementation = realCompress;
+function setCompressImplementationForTest(impl) {
+  compressImplementation = impl ?? realCompress;
+}
+async function compress(file) {
+  return await compressImplementation(file);
+}
+async function realCompress(file) {
+  const bitmap = await createImageBitmap(file);
+  try {
+    let width = bitmap.width;
+    let height = bitmap.height;
+    if (width > MAX_DIMENSION_PX || height > MAX_DIMENSION_PX) {
+      if (width > height) {
+        height = Math.round(height * MAX_DIMENSION_PX / width);
+        width = MAX_DIMENSION_PX;
+      } else {
+        width = Math.round(width * MAX_DIMENSION_PX / height);
+        height = MAX_DIMENSION_PX;
+      }
+    }
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Failed to get 2d context");
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    const blob = await canvas.convertToBlob({
+      type: "image/jpeg",
+      quality: 0.8
+    });
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result;
+        const base64Data = result.split(",")[1];
+        resolve(base64Data);
+      };
+      reader.onerror = () => reject(new Error("Failed to read compressed blob"));
+      reader.readAsDataURL(blob);
+    });
+    return {
+      data: base64,
+      mimeType: "image/jpeg"
+    };
+  } finally {
+    bitmap.close();
+  }
+}
+
+// gen/front_end/panels/ai_assistance/components/ChatInput.js
+var { html: html4, Directives: { createRef, ref } } = Lit4;
+var { widget } = UI.Widget;
+var UIStrings = {
+  /**
+   * @description Label added to the text input to describe the context for screen readers. Not shown visibly on screen.
+   */
+  inputTextAriaDescription: "You can also use one of the suggested prompts above to start your conversation",
+  /**
+   * @description Label added to the button that reveals the selected context item in DevTools.
+   */
+  revealContextDescription: "Reveal the selected context item in DevTools",
+  /**
+   * @description The footer disclaimer that links to more information about the AI feature.
+   */
+  learnAbout: "Learn about AI in DevTools"
+};
+var UIStringsNotTranslate = {
+  /**
+   * @description Title for the send icon button.
+   */
+  sendButtonTitle: "Send",
+  /**
+   * @description Title for the start new chat
+   */
+  startNewChat: "Start new chat",
+  /**
+   * @description Title for the cancel icon button.
+   */
+  cancelButtonTitle: "Cancel",
+  /**
+   * @description Label for the "select an element" button.
+   */
+  selectAnElement: "Select an element",
+  /**
+   * @description Title for the take screenshot button.
+   */
+  takeScreenshotButtonTitle: "Take screenshot",
+  /**
+   * @description Title for the remove image input button.
+   */
+  removeImageInputButtonTitle: "Remove image input",
+  /**
+   * @description Title for the add image button.
+   */
+  addImageButtonTitle: "Add image",
+  /**
+   * @description Text displayed when the chat input is disabled due to reading past conversation.
+   */
+  pastConversation: "You\u2019re viewing a past conversation.",
+  /**
+   * @description Message displayed in toast in case of any failures while taking a screenshot of the page.
+   */
+  screenshotFailureMessage: "Failed to take a screenshot. Please try again.",
+  /**
+   * @description Message displayed in toast in case of any failures while uploading an image file as input.
+   */
+  uploadImageFailureMessage: "Failed to upload image. Please try again.",
+  /**
+   * @description Message displayed in toast in case of uploaded image being too large.
+   */
+  fileTooLargeMessage: "File is too large. Please select an image under 10MB.",
+  /**
+   * @description Label added to the button that add selected context from the current panel in AI Assistance panel.
+   */
+  addContext: "Add item for context",
+  /**
+   * @description Label added to the button that remove the currently selected element in AI Assistance panel.
+   */
+  removeContextElement: "Remove element from context",
+  /**
+   * @description Label added to the button that remove the currently selected context in AI Assistance panel.
+   */
+  removeContextRequest: "Remove request from context",
+  /**
+   * @description Label added to the button that remove the currently selected context in AI Assistance panel.
+   */
+  removeContextFile: "Remove file from context",
+  /**
+   * @description Label added to the button that remove the currently selected context in AI Assistance panel.
+   */
+  removeContextPerfInsight: "Remove performance insight from context",
+  /**
+   * @description Label added to the button that remove the currently selected context in AI Assistance panel.
+   */
+  removeContextStorage: "Remove storage from context",
+  /**
+   * @description Label added to the button that remove the currently selected context in AI Assistance panel.
+   */
+  removeContext: "Remove from context"
+};
+var str_ = i18n.i18n.registerUIStrings("panels/ai_assistance/components/ChatInput.ts", UIStrings);
+var i18nString = i18n.i18n.getLocalizedString.bind(void 0, str_);
+var lockedString = i18n.i18n.lockedString;
+var SCREENSHOT_QUALITY = 80;
+var JPEG_MIME_TYPE = "image/jpeg";
+var SHOW_LOADING_STATE_TIMEOUT = 100;
+var MAX_IMAGE_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+var RELEVANT_DATA_LINK_CHAT_ID = "relevant-data-link-chat";
+var RELEVANT_DATA_LINK_FOOTER_ID = "relevant-data-link-footer";
+function getContextRemoveLabel(context) {
+  if (context instanceof AiAssistanceModel4.FileContext.FileContext) {
+    return lockedString(UIStringsNotTranslate.removeContextFile);
+  }
+  if (context instanceof AiAssistanceModel4.DOMNodeContext.DOMNodeContext) {
+    return lockedString(UIStringsNotTranslate.removeContextElement);
+  }
+  if (context instanceof AiAssistanceModel4.RequestContext.RequestContext) {
+    return lockedString(UIStringsNotTranslate.removeContextRequest);
+  }
+  if (context instanceof AiAssistanceModel4.PerformanceTraceContext.PerformanceTraceContext) {
+    return lockedString(UIStringsNotTranslate.removeContextPerfInsight);
+  }
+  if (context instanceof AiAssistanceModel4.StorageContext.StorageContext) {
+    return lockedString(UIStringsNotTranslate.removeContextStorage);
+  }
+  return lockedString(UIStringsNotTranslate.removeContext);
+}
+var DEFAULT_VIEW = (input, _output, target) => {
+  const chatInputContainerCls = Lit4.Directives.classMap({
+    "chat-input-container": true,
+    "single-line-layout": !input.context,
+    disabled: input.isTextInputDisabled
+  });
+  const renderRelevantDataDisclaimer = (tooltipId) => {
+    const classes = Lit4.Directives.classMap({
+      "chat-input-disclaimer": true,
+      "hide-divider": !input.isLoading && input.blockedByCrossOrigin
+    });
+    return html4`
+      <div class=${classes}>
+        <button
+          class="link"
+          role="link"
+          aria-details=${tooltipId}
+          jslog=${VisualLogging.link("open-ai-settings").track({
+      click: true
+    })}
+          @click=${(ev) => {
+      ev.preventDefault();
+      void UI.ViewManager.ViewManager.instance().showView("chrome-ai");
+    }}
+        >${lockedString("Relevant data")}</button>&nbsp;${lockedString("is sent to Google")}
+        <devtools-tooltip
+          id=${tooltipId}
+          variant="rich"
+        ><div class="info-tooltip-container">
+          ${input.disclaimerText}
+          <button
+            class="link tooltip-link"
+            role="link"
+            jslog=${VisualLogging.link("open-ai-settings").track({
+      click: true
+    })}
+            @click=${() => {
+      void UI.ViewManager.ViewManager.instance().showView("chrome-ai");
+    }}>${i18nString(UIStrings.learnAbout)}
+          </button>
+        </div></devtools-tooltip>
+      </div>
+    `;
+  };
+  Lit4.render(html4`
+    <style>${Input.textInputStyles}</style>
+    <style>${chatInput_css_default}</style>
+    ${input.isReadOnly ? html4`
+        <div
+          class="chat-readonly-container"
+          jslog=${VisualLogging.section("read-only")}
+        >
+          <span>${lockedString(UIStringsNotTranslate.pastConversation)}</span>
+          <devtools-button
+            aria-label=${lockedString(UIStringsNotTranslate.startNewChat)}
+            class="chat-inline-button"
+            @click=${input.onNewConversation}
+            .data=${{
+    variant: "text",
+    title: lockedString(UIStringsNotTranslate.startNewChat),
+    jslogContext: "start-new-chat"
+  }}
+          >${lockedString(UIStringsNotTranslate.startNewChat)}</devtools-button>
+        </div>` : html4`
+        <form class="input-form" @submit=${input.onSubmit}>
+          <div class=${chatInputContainerCls}>
+            ${input.multimodalInputEnabled && input.imageInput && !input.isTextInputDisabled ? html4`
+                <div class="image-input-container">
+                  <devtools-button
+                    aria-label=${lockedString(UIStringsNotTranslate.removeImageInputButtonTitle)}
+                    @click=${input.onRemoveImageInput}
+                    .data=${{
+    variant: "icon",
+    size: "MICRO",
+    iconName: "cross",
+    title: lockedString(UIStringsNotTranslate.removeImageInputButtonTitle)
+  }}
+                  ></devtools-button>
+                  ${input.imageInput.isLoading ? html4`
+                      <div class="loading">
+                        <devtools-spinner></devtools-spinner>
+                      </div>` : html4`
+                      <img src="data:${input.imageInput.mimeType};base64, ${input.imageInput.data}" alt="Image input" />`}
+                </div>` : Lit4.nothing}
+            <textarea
+              class="chat-input"
+              .disabled=${input.isTextInputDisabled}
+              wrap="hard"
+              maxlength="10000"
+              .value=${input.textInputValue}
+              @keydown=${input.onTextAreaKeyDown}
+              @paste=${input.onImagePaste}
+              @dragover=${input.onImageDragOver}
+              @drop=${input.onImageDrop}
+              @input=${(event) => {
+    input.onTextInputChange(event.target.value);
+  }}
+              placeholder=${input.inputPlaceholder}
+              jslog=${VisualLogging.textField("query").track({
+    change: true,
+    keydown: "Enter"
+  })}
+              aria-description=${i18nString(UIStrings.inputTextAriaDescription)}
+              ${ref(input.textAreaRef)}
+            ></textarea>
+            <div class="chat-input-actions">
+              <div class="chat-input-actions-left">
+                ${input.context ? html4`
+                    <div class="select-element">
+                      ${input.conversationType === "freestyler" ? html4`
+                          <devtools-button
+                            .data=${{
+    variant: "icon_toggle",
+    size: "SMALL",
+    iconName: "select-element",
+    toggledIconName: "select-element",
+    toggleType: "primary-toggle",
+    toggled: input.inspectElementToggled,
+    title: lockedString(UIStringsNotTranslate.selectAnElement),
+    jslogContext: "select-element",
+    disabled: input.isTextInputDisabled
+  }}
+                            @click=${input.onInspectElementClick}
+                          ></devtools-button>` : Lit4.nothing}
+                      <div
+                        class=${Lit4.Directives.classMap({
+    "resource-link": true,
+    disabled: !input.isContextSelected
+  })}
+                      >
+                        ${input.context instanceof AiAssistanceModel4.DOMNodeContext.DOMNodeContext ? html4`
+                              <devtools-widget
+                                class="title"
+                                ${widget(PanelsCommon3.DOMLinkifier.DOMNodeLink, {
+    node: input.context.getItem(),
+    options: {
+      disabled: !input.isContextSelected,
+      hiddenClassList: input.context.getItem().classNames().filter((className) => className.startsWith(AiAssistanceModel4.Injected.AI_ASSISTANCE_CSS_CLASS_NAME)),
+      ariaDescription: i18nString(UIStrings.revealContextDescription)
+    }
+  })}
+                              ></devtools-widget>` : html4`
+                          ${input.context instanceof AiAssistanceModel4.RequestContext.RequestContext ? PanelUtils.PanelUtils.getIconForNetworkRequest(input.context.getItem()) : input.context instanceof AiAssistanceModel4.FileContext.FileContext ? PanelUtils.PanelUtils.getIconForSourceFile(input.context.getItem()) : input.context instanceof AiAssistanceModel4.AccessibilityContext.AccessibilityContext ? html4`<devtools-icon class="icon" name="performance" title="Lighthouse"></devtools-icon>` : input.context instanceof AiAssistanceModel4.PerformanceTraceContext.PerformanceTraceContext ? html4`<devtools-icon class="icon" name="performance" title="Performance"></devtools-icon>` : input.context instanceof AiAssistanceModel4.StorageContext.StorageContext ? html4`<devtools-icon class="icon" name="table" title="Storage"></devtools-icon>` : Lit4.nothing}
+                            <span
+                              role="button"
+                              class="title"
+                              tabindex="0"
+                              @click=${input.onContextClick}
+                              @keydown=${(ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      void input.onContextClick();
+    }
+  }}
+                              aria-description=${i18nString(UIStrings.revealContextDescription)}
+                            >${input.context.getTitle()}</span>`}
+                        ${input.isContextSelected && input.onContextRemoved ? html4`
+                                  <devtools-button
+                                    title=${getContextRemoveLabel(input.context)}
+                                    aria-label=${getContextRemoveLabel(input.context)}
+                                    class="remove-context"
+                                    .iconName=${"cross"}
+                                    .size=${"MICRO"}
+                                    .jslogContext=${"context-removed"}
+                                    .variant=${"icon"}
+                                    @click=${input.onContextRemoved}></devtools-button>` : Lit4.nothing}
+                      ${!input.isContextSelected && input.onContextAdd ? html4`
+                                    <devtools-button
+                                      title=${lockedString(UIStringsNotTranslate.addContext)}
+                                      aria-label=${lockedString(UIStringsNotTranslate.addContext)}
+                                      class="add-context"
+                                      .iconName=${"plus"}
+                                      .size=${"MICRO"}
+                                      .jslogContext=${"context-added"}
+                                      .variant=${"icon"}
+                                      @click=${input.onContextAdd}></devtools-button>` : Lit4.nothing}
+                      </div>
+                    </div>` : Lit4.nothing}
+              </div>
+              <div class="chat-input-actions-right">
+                <div class="chat-input-disclaimer-container">
+                  ${renderRelevantDataDisclaimer(RELEVANT_DATA_LINK_CHAT_ID)}
+                </div>
+                ${input.multimodalInputEnabled && !input.blockedByCrossOrigin ? html4`
+                    ${input.uploadImageInputEnabled ? html4`
+                        <devtools-button
+                          class="chat-input-button"
+                          aria-label=${lockedString(UIStringsNotTranslate.addImageButtonTitle)}
+                          @click=${input.onImageUpload}
+                          .data=${{
+    variant: "icon",
+    size: "REGULAR",
+    disabled: input.isTextInputDisabled || input.imageInput?.isLoading,
+    iconName: "add-photo",
+    title: lockedString(UIStringsNotTranslate.addImageButtonTitle),
+    jslogContext: "upload-image"
+  }}
+                        ></devtools-button>` : Lit4.nothing}
+                    <devtools-button
+                      class="chat-input-button"
+                      aria-label=${lockedString(UIStringsNotTranslate.takeScreenshotButtonTitle)}
+                      @click=${input.onTakeScreenshot}
+                      .data=${{
+    variant: "icon",
+    size: "REGULAR",
+    disabled: input.isTextInputDisabled || input.imageInput?.isLoading,
+    iconName: "photo-camera",
+    title: lockedString(UIStringsNotTranslate.takeScreenshotButtonTitle),
+    jslogContext: "take-screenshot"
+  }}
+                    ></devtools-button>` : Lit4.nothing}
+                ${input.isLoading ? html4`
+                    <devtools-button
+                      class="chat-input-button"
+                      aria-label=${lockedString(UIStringsNotTranslate.cancelButtonTitle)}
+                      @click=${input.onCancel}
+                      .data=${{
+    variant: "icon",
+    size: "REGULAR",
+    iconName: "record-stop",
+    title: lockedString(UIStringsNotTranslate.cancelButtonTitle),
+    jslogContext: "stop"
+  }}
+                    ></devtools-button>` : input.blockedByCrossOrigin ? html4`
+                      <devtools-button
+                        class="start-new-chat-button"
+                        aria-label=${lockedString(UIStringsNotTranslate.startNewChat)}
+                        @click=${input.onNewConversation}
+                        .data=${{
+    variant: "outlined",
+    size: "SMALL",
+    title: lockedString(UIStringsNotTranslate.startNewChat),
+    jslogContext: "start-new-chat"
+  }}
+                      >${lockedString(UIStringsNotTranslate.startNewChat)}</devtools-button>` : html4`
+                      <devtools-button
+                        class="chat-input-button"
+                        aria-label=${lockedString(UIStringsNotTranslate.sendButtonTitle)}
+                        .data=${{
+    type: "submit",
+    variant: "icon",
+    size: "REGULAR",
+    disabled: input.isTextInputDisabled || input.isTextInputEmpty || input.imageInput?.isLoading,
+    iconName: "send",
+    title: lockedString(UIStringsNotTranslate.sendButtonTitle),
+    jslogContext: "send"
+  }}
+                      ></devtools-button>`}
+              </div>
+            </div>
+          </div>
+        </form>`}
+    <footer
+      class=${Lit4.Directives.classMap({
+    "chat-input-footer": true,
+    "is-read-only": input.isReadOnly
+  })}
+      jslog=${VisualLogging.section("footer")}
+    >
+      ${renderRelevantDataDisclaimer(RELEVANT_DATA_LINK_FOOTER_ID)}
+    </footer>
+  `, target);
+};
+var ChatInput = class extends UI.Widget.Widget {
+  isLoading = false;
+  blockedByCrossOrigin = false;
+  isTextInputDisabled = false;
+  inputPlaceholder = "";
+  context = null;
+  isContextSelected = false;
+  inspectElementToggled = false;
+  disclaimerText = "";
+  conversationType = "freestyler";
+  multimodalInputEnabled = false;
+  uploadImageInputEnabled = false;
+  isReadOnly = false;
+  textInputValue = "";
+  #textAreaRef = createRef();
+  #imageInput;
+  /**
+   * Tracks the user's position when navigating through prompt history.
+   * -1 means the user is at the newest "uncommitted" position (the current input).
+   * 0 to N-1 are indices into the recent prompts array (newest to oldest).
+   */
+  #historyOffset = -1;
+  /**
+   * Stores the text the user had typed before they started navigating through history,
+   * so it can be restored if they navigate back to the newest position.
+   */
+  #uncommittedText = "";
+  setInputValue(text) {
+    if (this.#textAreaRef.value) {
+      const maxLength = this.#textAreaRef.value.maxLength;
+      const truncatedText = maxLength >= 0 ? text.substring(0, maxLength) : text;
+      this.#textAreaRef.value.value = truncatedText;
+      this.#textAreaRef.value.setSelectionRange(truncatedText.length, truncatedText.length);
+      this.textInputValue = truncatedText;
+      this.onTextChange(truncatedText);
+    }
+    this.performUpdate();
+  }
+  #isTextInputEmpty() {
+    const text = this.#textAreaRef?.value?.value ?? this.textInputValue;
+    return !text.trim();
+  }
+  onTextSubmit = () => {
+  };
+  onTextChange = () => {
+  };
+  onContextClick = () => {
+  };
+  onInspectElementClick = () => {
+  };
+  onCancelClick = () => {
+  };
+  onNewConversation = () => {
+  };
+  onContextRemoved = null;
+  onContextAdd = null;
+  /**
+   * Navigates the prompt history.
+   * @param dir direction to navigate. -1 for older, 1 for newer.
+   */
+  #navigatePromptHistory(dir) {
+    const prompts = AiAssistanceModel4.AiHistoryStorage.AiHistoryStorage.instance().getRecentPrompts();
+    if (!prompts.length) {
+      return;
+    }
+    if (dir === -1) {
+      if (this.#historyOffset === -1) {
+        this.#uncommittedText = this.#textAreaRef.value?.value || "";
+      }
+      if (this.#historyOffset < prompts.length - 1) {
+        this.#historyOffset++;
+        this.setInputValue(prompts[this.#historyOffset]);
+      }
+    } else if (this.#historyOffset > 0) {
+      this.#historyOffset--;
+      this.setInputValue(prompts[this.#historyOffset]);
+    } else if (this.#historyOffset === 0) {
+      this.#historyOffset = -1;
+      this.setInputValue(this.#uncommittedText);
+    }
+  }
+  async #handleTakeScreenshot() {
+    const mainTarget = SDK3.TargetManager.TargetManager.instance().primaryPageTarget();
+    if (!mainTarget) {
+      throw new Error("Could not find main target");
+    }
+    const model = mainTarget.model(SDK3.ScreenCaptureModel.ScreenCaptureModel);
+    if (!model) {
+      throw new Error("Could not find model");
+    }
+    const showLoadingTimeout = setTimeout(() => {
+      this.#imageInput = { isLoading: true };
+      this.performUpdate();
+    }, SHOW_LOADING_STATE_TIMEOUT);
+    const bytes = await model.captureScreenshot(
+      "jpeg",
+      SCREENSHOT_QUALITY,
+      "fromViewport"
+      /* SDK.ScreenCaptureModel.ScreenshotMode.FROM_VIEWPORT */
+    );
+    clearTimeout(showLoadingTimeout);
+    if (bytes) {
+      this.#imageInput = {
+        isLoading: false,
+        data: bytes,
+        mimeType: JPEG_MIME_TYPE,
+        inputType: "screenshot"
+      };
+      this.performUpdate();
+      void this.updateComplete.then(() => {
+        this.focusTextInput();
+      });
+    } else {
+      this.#imageInput = void 0;
+      this.performUpdate();
+      Snackbars.Snackbar.Snackbar.show({ message: lockedString(UIStringsNotTranslate.screenshotFailureMessage) });
+    }
+  }
+  targetAdded(_target) {
+  }
+  targetRemoved(_target) {
+  }
+  #handleRemoveImageInput() {
+    this.#imageInput = void 0;
+    this.performUpdate();
+    void this.updateComplete.then(() => {
+      this.focusTextInput();
+    });
+  }
+  #handleImageDataTransferEvent(dataTransfer, event) {
+    if (this.conversationType !== "freestyler") {
+      return;
+    }
+    const files = dataTransfer?.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+    const imageFile = Array.from(files).find((file) => file.type.startsWith("image/"));
+    if (!imageFile) {
+      return;
+    }
+    event.preventDefault();
+    void this.#handleLoadImage(imageFile);
+  }
+  #handleImagePaste = (event) => {
+    this.#handleImageDataTransferEvent(event.clipboardData, event);
+  };
+  #handleImageDragOver = (event) => {
+    if (this.conversationType !== "freestyler") {
+      return;
+    }
+    event.preventDefault();
+  };
+  #handleImageDrop = (event) => {
+    this.#handleImageDataTransferEvent(event.dataTransfer, event);
+  };
+  async #handleLoadImage(file) {
+    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+      Snackbars.Snackbar.Snackbar.show({ message: lockedString(UIStringsNotTranslate.fileTooLargeMessage) });
+      return;
+    }
+    const showLoadingTimeout = setTimeout(() => {
+      this.#imageInput = { isLoading: true };
+      this.performUpdate();
+    }, SHOW_LOADING_STATE_TIMEOUT);
+    try {
+      const compressed = await compress(file);
+      this.#imageInput = {
+        isLoading: false,
+        data: compressed.data,
+        mimeType: compressed.mimeType,
+        inputType: "uploaded-image"
+      };
+    } catch (err) {
+      console.error("Failed to compress image:", err);
+      this.#imageInput = void 0;
+      Snackbars.Snackbar.Snackbar.show({ message: lockedString(UIStringsNotTranslate.uploadImageFailureMessage) });
+    }
+    clearTimeout(showLoadingTimeout);
+    this.performUpdate();
+    void this.updateComplete.then(() => {
+      this.focusTextInput();
+    });
+  }
+  #view;
+  constructor(element, view) {
+    super(element);
+    this.#view = view ?? DEFAULT_VIEW;
+  }
+  wasShown() {
+    super.wasShown();
+    SDK3.TargetManager.TargetManager.instance().addModelListener(SDK3.ResourceTreeModel.ResourceTreeModel, SDK3.ResourceTreeModel.Events.PrimaryPageChanged, this.#onPrimaryPageChanged, this);
+  }
+  willHide() {
+    super.willHide();
+    SDK3.TargetManager.TargetManager.instance().removeModelListener(SDK3.ResourceTreeModel.ResourceTreeModel, SDK3.ResourceTreeModel.Events.PrimaryPageChanged, this.#onPrimaryPageChanged, this);
+  }
+  #onPrimaryPageChanged() {
+    this.#imageInput = void 0;
+    this.performUpdate();
+  }
+  performUpdate() {
+    this.#view({
+      inputPlaceholder: this.inputPlaceholder,
+      isLoading: this.isLoading,
+      blockedByCrossOrigin: this.blockedByCrossOrigin,
+      isTextInputDisabled: this.isTextInputDisabled,
+      context: this.context,
+      isContextSelected: this.isContextSelected,
+      inspectElementToggled: this.inspectElementToggled,
+      isTextInputEmpty: this.#isTextInputEmpty(),
+      disclaimerText: this.disclaimerText,
+      conversationType: this.conversationType,
+      multimodalInputEnabled: this.multimodalInputEnabled,
+      imageInput: this.#imageInput,
+      uploadImageInputEnabled: this.uploadImageInputEnabled,
+      isReadOnly: this.isReadOnly,
+      textInputValue: this.textInputValue,
+      textAreaRef: this.#textAreaRef,
+      onContextClick: this.onContextClick,
+      onInspectElementClick: this.onInspectElementClick,
+      onImagePaste: this.#handleImagePaste,
+      onNewConversation: this.onNewConversation,
+      onTextInputChange: (text) => {
+        this.textInputValue = text;
+        this.onTextChange(text);
+        this.requestUpdate();
+      },
+      onTakeScreenshot: this.#handleTakeScreenshot.bind(this),
+      onRemoveImageInput: this.#handleRemoveImageInput.bind(this),
+      onSubmit: this.onSubmit,
+      onTextAreaKeyDown: this.onTextAreaKeyDown,
+      onCancel: this.onCancel,
+      onImageUpload: this.onImageUpload,
+      onImageDragOver: this.#handleImageDragOver,
+      onImageDrop: this.#handleImageDrop,
+      onContextRemoved: this.onContextRemoved,
+      onContextAdd: this.onContextAdd
+    }, void 0, this.contentElement);
+  }
+  focusTextInput() {
+    this.#textAreaRef.value?.focus();
+  }
+  onSubmit = (event) => {
+    event.preventDefault();
+    if (this.#imageInput?.isLoading) {
+      return;
+    }
+    const imageInput = !this.#imageInput?.isLoading && this.#imageInput?.data ? { inlineData: { data: this.#imageInput.data, mimeType: this.#imageInput.mimeType } } : void 0;
+    const text = this.#textAreaRef.value?.value?.trim() ?? "";
+    if (!text && !imageInput) {
+      return;
+    }
+    this.onTextSubmit(this.#textAreaRef.value?.value ?? "", imageInput, this.#imageInput?.inputType);
+    this.#imageInput = void 0;
+    this.#historyOffset = -1;
+    this.#uncommittedText = "";
+    this.setInputValue("");
+  };
+  onTextAreaKeyDown = (event) => {
+    if (!event.target || !(event.target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      const { value, selectionStart, selectionEnd } = event.target;
+      if (selectionStart === selectionEnd && value.lastIndexOf("\n", selectionStart - 1) === -1) {
+        event.preventDefault();
+        this.#navigatePromptHistory(-1);
+      }
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      const { selectionEnd, selectionStart, value } = event.target;
+      if (selectionStart === selectionEnd && value.indexOf("\n", selectionEnd) === -1) {
+        event.preventDefault();
+        this.#navigatePromptHistory(1);
+      }
+      return;
+    }
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      if (!event.target?.value || this.#imageInput?.isLoading) {
+        return;
+      }
+      const imageInput = !this.#imageInput?.isLoading && this.#imageInput?.data ? { inlineData: { data: this.#imageInput.data, mimeType: this.#imageInput.mimeType } } : void 0;
+      this.onTextSubmit(event.target.value, imageInput, this.#imageInput?.inputType);
+      this.#imageInput = void 0;
+      this.#historyOffset = -1;
+      this.#uncommittedText = "";
+      this.setInputValue("");
+    }
+  };
+  onCancel = (ev) => {
+    ev.preventDefault();
+    if (!this.isLoading) {
+      return;
+    }
+    this.onCancelClick();
+  };
+  onImageUpload = (ev) => {
+    ev.stopPropagation();
+    const fileSelector = UI.UIUtils.createFileSelectorElement(this.#handleLoadImage.bind(this), ".jpeg,.jpg,.png");
+    fileSelector.click();
+  };
+};
+
+// gen/front_end/panels/ai_assistance/components/ChatMessage.js
+var ChatMessage_exports = {};
+__export(ChatMessage_exports, {
+  ChatMessage: () => ChatMessage,
+  ChatMessageEntity: () => ChatMessageEntity,
+  DEFAULT_VIEW: () => DEFAULT_VIEW3,
+  getDeduplicatedWidgetsMessage: () => getDeduplicatedWidgetsMessage,
+  getWidgetSignature: () => getWidgetSignature,
+  renderStep: () => renderStep,
+  titleForStep: () => titleForStep
+});
+import "../../ui/components/markdown_view/markdown_view.js";
+import "../../ui/kit/kit.js";
+import * as Common3 from "../../core/common/common.js";
+import * as Host from "../../core/host/host.js";
+import * as i18n5 from "../../core/i18n/i18n.js";
+import * as Platform3 from "../../core/platform/platform.js";
+import * as SDK4 from "../../core/sdk/sdk.js";
+import * as TextUtils from "../../core/text_utils/text_utils.js";
+import * as AiAssistanceModel6 from "../../models/ai_assistance/ai_assistance.js";
+import * as ComputedStyle from "../../models/computed_style/computed_style.js";
+import * as Formatter from "../../models/formatter/formatter.js";
+import * as Trace2 from "../../models/trace/trace.js";
+import * as Workspace from "../../models/workspace/workspace.js";
+import * as PanelsCommon4 from "../common/common.js";
+import * as TraceBounds from "../../services/trace_bounds/trace_bounds.js";
+import * as Marked from "../../third_party/marked/marked.js";
+import * as Buttons3 from "../../ui/components/buttons/buttons.js";
+import * as Input3 from "../../ui/components/input/input.js";
+import * as Snackbars2 from "../../ui/components/snackbars/snackbars.js";
+import * as UIHelpers from "../../ui/helpers/helpers.js";
+import * as UI3 from "../../ui/legacy/legacy.js";
+import * as Lit6 from "../../ui/lit/lit.js";
+import * as VisualLogging3 from "../../ui/visual_logging/visual_logging.js";
+import * as Application from "../application/application.js";
+import * as Elements from "../elements/elements.js";
+import * as Lighthouse from "../lighthouse/lighthouse.js";
+import * as NetworkForward from "../network/forward/forward.js";
+import * as Network from "../network/network.js";
+import * as TimelineComponents from "../timeline/components/components.js";
+import * as TimelineInsights from "../timeline/components/insights/insights.js";
+import * as Timeline from "../timeline/timeline.js";
+import * as TimelineUtils from "../timeline/utils/utils.js";
+import { PanelUtils as PanelUtils3 } from "../utils/utils.js";
+
+// gen/front_end/panels/ai_assistance/components/chatMessage.css.js
+var chatMessage_css_default = `/*
+ * Copyright 2024 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope to (devtools-widget > *) {
+  .ai-assistance-feedback-row {
+    font-family: var(--default-font-family);
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-block: calc(-1 * var(--sys-size-3));
+    margin-top: var(--sys-size-5);
+    overflow: hidden;
+    mask-image: linear-gradient(to right, var(--ref-palette-neutral0) calc(100% - var(--sys-size-15)), transparent 100%);
+
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      gap: var(--sys-size-2);
+      padding: var(--sys-size-4) 0;
+    }
+
+    .vertical-separator {
+      height: var(--sys-size-8);
+      width: var(--sys-size-1);
+      vertical-align: top;
+      margin: 0 var(--sys-size-2);
+      background: var(--sys-color-divider);
+      display: inline-block;
+    }
+
+    .suggestions-container {
+      overflow: hidden;
+      position: relative;
+      display: flex;
+
+      .suggestions-scroll-container {
+        display: flex;
+        overflow: auto hidden;
+        scrollbar-width: none;
+        gap: var(--sys-size-3);
+        padding: var(--sys-size-3);
+      }
+
+      .scroll-button-container {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        width: var(--sys-size-15);
+        z-index: 999;
+      }
+
+      .scroll-button-container.hidden {
+        display: none;
+      }
+
+      .scroll-button-container.left {
+        left: 0;
+        background:
+          linear-gradient(
+            90deg,
+            var(--sys-color-cdt-base-container) 0%,
+            var(--sys-color-cdt-base-container) 50%,
+            transparent
+          );
+      }
+
+      .scroll-button-container.right {
+        right: 0;
+        background:
+          linear-gradient(
+            90deg,
+            transparent,
+            var(--sys-color-cdt-base-container) 50%
+          );
+        justify-content: flex-end;
+      }
+    }
+  }
+
+  .feedback-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-5);
+    margin-top: var(--sys-size-4);
+    background-color: var(--sys-color-surface3);
+    padding: var(--sys-size-6);
+    border-radius: var(--sys-shape-corner-medium-small);
+    max-width: var(--sys-size-32);
+
+    .feedback-input {
+      height: var(--sys-size-11);
+      padding: 0 var(--sys-size-5);
+      background-color: var(--sys-color-surface3);
+      width: auto;
+    }
+
+    .feedback-input::placeholder {
+      color: var(--sys-color-on-surface-subtle);
+      font: var(--sys-typescale-body4-regular);
+    }
+
+    .feedback-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .feedback-title {
+      margin: 0;
+      font: var(--sys-typescale-body3-medium);
+    }
+
+    .feedback-disclaimer {
+      padding: 0 var(--sys-size-4);
+    }
+  }
+
+  .user-query-wrapper {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 var(--sys-size-5);
+    align-items: center;
+  }
+
+  .chat-message {
+    user-select: text;
+    cursor: initial;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-5);
+    width: 100%;
+    padding: var(--sys-size-7) var(--sys-size-5);
+    font-size: var(--sys-typescale-body4-size);
+    word-break: normal;
+    overflow-wrap: anywhere;
+
+    &.query {
+      width: fit-content;
+      max-width: 80%;
+      text-align: left;
+      padding: var(--sys-size-4) var(--sys-size-6);
+      font: var(--sys-typescale-body4-regular);
+      /* top left - top right - bottom right - bottom left */
+      border-radius: var(--sys-shape-corner-medium) var(--sys-shape-corner-extra-small) var(--sys-shape-corner-medium) var(--sys-shape-corner-medium);
+      background-color: var(--sys-color-surface5);
+      color: var(--sys-color-on-surface);
+
+      &.is-first-message {
+        /* So the first message doesn't bump right against the top
+         * toolbar */
+        margin-top: var(--sys-size-6);
+      }
+    }
+
+    .ai-css-change {
+      margin: var(--sys-size-6) 0;
+    }
+
+    .answer-body-wrapper {
+      @container(min-width: 700px) {
+        /* Purposefully not using design system variables, this is a
+         * specific size to indent the content in and align it with the
+         * walkthrough CTA. */
+        padding-left: 35px;
+      }
+    }
+
+    &.is-last-message {
+      border-bottom: 0;
+    }
+
+    .message-info {
+      display: flex;
+      align-items: center;
+      height: var(--sys-size-11);
+      gap: var(--sys-size-4);
+      font: var(--sys-typescale-body4-bold);
+
+      h2 {
+        font: var(--sys-typescale-body4-bold);
+      }
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sys-size-8);
+      max-width: 100%;
+    }
+
+    .aborted {
+      color: var(--sys-color-on-surface-subtle);
+    }
+
+    .image-link {
+      width: fit-content;
+      border-radius: var(--sys-shape-corner-small);
+      outline-offset: var(--sys-size-2);
+
+      img {
+        max-height: var(--sys-size-20);
+        max-width: 100%;
+        border-radius: var(--sys-shape-corner-small);
+        border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+        width: fit-content;
+        vertical-align: bottom;
+      }
+    }
+
+    .unavailable-image {
+      margin: var(--sys-size-4) 0;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      height: var(--sys-size-17);
+      width: var(--sys-size-18);
+      background-color: var(--sys-color-surface3);
+      border-radius: var(--sys-shape-corner-small);
+      border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+
+      devtools-icon {
+        color: var(--sys-color-state-disabled);
+      }
+    }
+  }
+
+  .indicator {
+    color: var(--sys-color-green-bright);
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    padding: var(--sys-size-3);
+    line-height: var(--sys-size-9);
+    cursor: default;
+    gap: var(--sys-size-3);
+    justify-content: center;
+    align-items: center;
+
+    .title {
+      margin: 0;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+      font: var(--sys-typescale-body4-regular);
+
+      .paused {
+        font: var(--sys-typescale-body4-bold);
+      }
+    }
+  }
+
+  .step-code {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-2);
+  }
+
+  .show-all-container {
+    padding-bottom: 0;
+  }
+
+  .js-code-output {
+    devtools-code-block {
+      --code-block-max-code-height: 50px;
+    }
+  }
+
+  .context-details {
+    devtools-code-block {
+      --code-block-max-code-height: var(--sys-size-19);
+    }
+  }
+
+  .step {
+    width: fit-content;
+    background-color: var(--sys-color-surface3);
+    border-radius: var(--sys-shape-corner-medium);
+    position: relative;
+
+    &.empty {
+      pointer-events: none;
+
+      .arrow {
+        display: none;
+      }
+    }
+
+    &:not(&[open]):hover::after {
+      content: '';
+      height: 100%;
+      width: 100%;
+      border-radius: inherit;
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      background-color: var(--sys-color-state-hover-on-subtle);
+    }
+
+    &.paused {
+      .indicator {
+        color: var(--sys-color-on-surface-subtle);
+      }
+    }
+
+    &.canceled {
+      .summary {
+        color: var(--sys-color-state-disabled);
+        text-decoration: line-through;
+      }
+
+      .indicator {
+        color: var(--sys-color-state-disabled);
+      }
+    }
+
+    devtools-markdown-view {
+      --code-background-color: var(--sys-color-surface1);
+    }
+
+    devtools-icon {
+      vertical-align: bottom;
+    }
+
+    devtools-spinner {
+      width: var(--sys-size-9);
+      height: var(--sys-size-9);
+      padding: var(--sys-size-2);
+    }
+
+    &[open] {
+      width: auto;
+
+      summary {
+        margin-bottom: var(--sys-size-2);
+      }
+
+      .summary .title {
+        white-space: normal;
+        overflow: unset;
+      }
+
+      .summary .arrow {
+        transform: rotate(180deg);
+      }
+    }
+
+    summary::marker {
+      content: '';
+    }
+
+    summary {
+      border-radius: var(--sys-shape-corner-medium);
+
+      &:focus-visible {
+        outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+        outline-offset: var(--sys-size-2);
+      }
+    }
+
+    .step-details {
+      padding: 0 var(--sys-size-5) var(--sys-size-4) var(--sys-size-12);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sys-size-6);
+
+      devtools-code-block {
+        --code-block-background-color: var(--sys-color-surface1);
+      }
+    }
+  }
+
+
+  .error-step {
+    color: var(--sys-color-error);
+  }
+
+  .side-effect-confirmation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-5);
+    padding-bottom: var(--sys-size-4);
+  }
+
+  .side-effect-buttons-container {
+    display: flex;
+    gap: var(--sys-size-4);
+  }
+
+  .walkthrough-toggle-container {
+    display: flex;
+    gap: var(--sys-size-2);
+    align-items: center;
+
+    &.has-widgets {
+      gap: var(--sys-size-6);
+    }
+
+    .chevron {
+      color: var(--sys-color-primary);
+      width: var(--sys-size-8);
+      height: var(--sys-size-8);
+      margin-left: var(--sys-size-2);
+    }
+  }
+
+
+  .computed-styles-widget {
+    display: block;
+    width: fit-content;
+  }
+
+  .styling-preview-widget {
+    width: 100%;
+    min-height: 100px;
+  }
+
+  .main-widgets-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-5);
+  }
+
+  .step-widgets-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sys-size-5);
+  }
+
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    height: var(--sys-size-11);
+    align-items: center;
+    background: var(--sys-color-surface5);
+    padding: var(--sys-size-2) var(--sys-size-4);
+    border-top-left-radius: var(--sys-shape-corner-small);
+    border-top-right-radius: var(--sys-shape-corner-small);
+
+    .widget-name {
+      font: var(--sys-typescale-body4-regular);
+      margin: 0;
+      max-width: 80%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap; /* stop the titles going onto multiple lines */
+    }
+
+    /* This widget's title is some text + then a DOM node link, so it
+     * needs some extra styling */
+    .computed-style-title-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: var(--sys-size-3);
+    }
+
+    .computed-style-title-prefix {
+      flex-shrink: 0;
+    }
+
+    .widget-reveal-container {
+      padding: 0;
+      background: none;
+      border-radius: 0;
+    }
+  }
+
+  .widget-reveal-button {
+    display: flex;
+    align-items: center;
+
+    devtools-icon {
+      margin-left: var(--sys-size-3);
+      color: var(--sys-color-primary);
+      width: var(--sys-size-8);
+      height: var(--sys-size-8);
+    }
+
+  }
+
+  .widget-and-revealer-container {
+    width: 100%;
+    min-width: var(--sys-size-30);
+    max-width: var(--sys-size-33);
+  }
+
+  .widget-reveal-container {
+    background: var(--sys-color-surface5);
+    border-bottom-right-radius: var(--sys-shape-corner-small);
+    border-bottom-left-radius: var(--sys-shape-corner-small);
+    padding: 0 var(--sys-size-4) var(--sys-size-4) 0;
+  }
+
+  .revealer-only .widget-reveal-container {
+    background: none;
+    border-radius: unset;
+  }
+
+  .widget-content-container {
+    padding: var(--sys-size-4) var(--sys-size-5);
+    border-top-left-radius: var(--sys-shape-corner-medium);
+    border-top-right-radius: var(--sys-shape-corner-medium);
+    overflow-x: auto;
+    background-color: var(--sys-color-surface3);
+
+    --override-computed-style-property-white-space: normal;
+
+    /* When header is present, content follows it and shouldn't have top radii */
+    .widget-header+& {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+
+    /* When header is present, content is the last child and needs bottom radii */
+    .widget-header+&:last-child {
+      border-bottom-left-radius: var(--sys-shape-corner-medium);
+      border-bottom-right-radius: var(--sys-shape-corner-medium);
+    }
+  }
+
+  .network-request-preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-4);
+    margin-bottom: var(--sys-size-5);
+    padding-bottom: var(--sys-size-5);
+    border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+
+    .network-request-header {
+      display: flex;
+      align-items: center;
+      gap: var(--sys-size-5);
+
+      .network-request-icon {
+        width: var(--sys-size-13);
+        height: var(--sys-size-13);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--sys-color-surface1);
+        border-radius: var(--sys-shape-corner-small);
+        border: var(--sys-size-1) solid var(--sys-color-divider);
+        overflow: hidden;
+
+        img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+        }
+
+        devtools-icon {
+          width: var(--sys-size-9);
+          height: var(--sys-size-9);
+        }
+      }
+
+      .network-request-details {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+
+        .network-request-name {
+          font: var(--sys-typescale-body4-bold);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .network-request-size {
+          font: var(--sys-typescale-body4-regular);
+          color: var(--sys-color-on-surface-subtle);
+        }
+      }
+    }
+  }
+
+
+  .source-files-details {
+    display: contents;
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+      padding: var(--sys-size-3) var(--sys-size-6);
+      border: var(--sys-size-1) solid var(--sys-color-neutral-outline);
+      border-radius: var(--sys-shape-corner-small);
+      color: var(--sys-color-primary);
+      width: fit-content;
+
+      &:hover {
+        background-color: var(--sys-color-state-hover-on-subtle);
+      }
+    }
+
+    &[open] summary {
+      display: none;
+    }
+  }
+
+  .network-requests-widget {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-4);
+  }
+
+  .storage-breakdown-widget {
+    display: flex;
+    justify-content: center;
+    padding: var(--sys-size-4);
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/chatMessage.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/WalkthroughUtils.js
+var WalkthroughUtils_exports = {};
+__export(WalkthroughUtils_exports, {
+  getButtonLabel: () => getButtonLabel
+});
+function smartTruncate(text, targetLength) {
+  if (text.length <= targetLength) {
+    return { truncatedText: text, moreCharacters: 0 };
+  }
+  const lastSpaceBefore = text.lastIndexOf(" ", targetLength);
+  const firstSpaceAfter = text.indexOf(" ", targetLength);
+  let cutIndex = targetLength;
+  if (lastSpaceBefore === -1 && firstSpaceAfter === -1) {
+    cutIndex = targetLength;
+  } else if (lastSpaceBefore === -1) {
+    cutIndex = firstSpaceAfter;
+  } else if (firstSpaceAfter === -1) {
+    cutIndex = lastSpaceBefore;
+  } else {
+    const distanceToSpaceBefore = targetLength - lastSpaceBefore;
+    const distanceToSpaceAfter = firstSpaceAfter - targetLength;
+    cutIndex = distanceToSpaceBefore <= distanceToSpaceAfter ? lastSpaceBefore : firstSpaceAfter;
+  }
+  let truncatedText = text;
+  let moreCharacters = 0;
+  if (cutIndex < text.length) {
+    truncatedText = text.slice(0, cutIndex);
+    moreCharacters = text.length - cutIndex;
+  }
+  return { truncatedText, moreCharacters };
+}
+function getButtonLabel(input) {
+  let labelBase = "";
+  if (input.isLoading && !input.isExpanded && input.stepTitle) {
+    labelBase = input.stepTitle;
+  } else {
+    const action3 = input.isExpanded ? "Hide" : "Show";
+    const type = input.hasWidgets ? "AI walkthrough" : "thinking";
+    labelBase = `${action3} ${type}`;
+  }
+  if (input.isLoading) {
+    return `Loading: ${labelBase}`;
+  }
+  const TARGET_LENGTH = 50;
+  const { truncatedText, moreCharacters } = smartTruncate(input.prompt, TARGET_LENGTH);
+  const promptSuffix = moreCharacters > 0 ? ` (and ${moreCharacters} more characters)` : "";
+  return `${labelBase} for prompt ${truncatedText}${promptSuffix}`;
+}
+
+// gen/front_end/panels/ai_assistance/components/WalkthroughView.js
+var WalkthroughView_exports = {};
+__export(WalkthroughView_exports, {
+  DEFAULT_VIEW: () => DEFAULT_VIEW2,
+  WalkthroughView: () => WalkthroughView,
+  walkthroughCloseTitle: () => walkthroughCloseTitle,
+  walkthroughTitle: () => walkthroughTitle
+});
+import * as i18n3 from "../../core/i18n/i18n.js";
+import * as AiAssistanceModel5 from "../../models/ai_assistance/ai_assistance.js";
+import * as Buttons2 from "../../ui/components/buttons/buttons.js";
+import * as Input2 from "../../ui/components/input/input.js";
+import * as UI2 from "../../ui/legacy/legacy.js";
+import * as Lit5 from "../../ui/lit/lit.js";
+import * as VisualLogging2 from "../../ui/visual_logging/visual_logging.js";
+
+// gen/front_end/panels/ai_assistance/components/walkthroughView.css.js
+var walkthroughView_css_default = `/*
+ * Copyright 2026 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope (devtools-widget) {
+  .walkthrough-view {
+    height: 100%;
+    background-color: var(--sys-color-cdt-base-container);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@scope (devtools-widget > *) {
+  .walkthrough-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 var(--sys-size-5);
+    height: 35px;
+    border-bottom: var(--sys-size-1) solid var(--sys-color-divider);
+    flex-shrink: 0;
+  }
+
+  .walkthrough-title {
+    font-size: var(--sys-typescale-body5-size);
+    font-weight: 500;
+    color: var(--sys-color-on-surface);
+  }
+
+  .steps-container {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .steps-scroll-content {
+    padding: var(--sys-size-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-6);
+  }
+
+  .walkthrough-step {
+    display: flex;
+    gap: var(--sys-size-6);
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-shrink: 0;
+
+    .step-number {
+      font: var(--sys-typescale-body4-regular);
+      color: var(--sys-color-on-surface-subtle);
+      padding-top:var(--sys-size-4);
+      flex-grow: 0;
+      flex-shrink: 0;
+    }
+  }
+
+  .step-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-5);
+    min-width: 0;
+    width: 100%;
+  }
+
+  .step-container {
+    display: flex;
+    gap: var(--sys-size-5);
+    align-items: flex-start;
+  }
+
+  .step-icon {
+    color: var(--sys-color-on-surface-subtle);
+    width: var(--sys-size-8);
+    height: var(--sys-size-8);
+    flex-shrink: 0;
+    margin-top: var(--sys-size-2);
+  }
+
+  .step-content {
+    flex: 1;
+    font-size: var(--sys-typescale-body5-size);
+    color: var(--sys-color-on-surface);
+    line-height: 1.4;
+  }
+
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--sys-color-on-surface-subtle);
+    font-size: var(--sys-typescale-body5-size);
+  }
+
+  .inline-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--sys-size-2);
+    justify-content: flex-start;
+
+    .inline-icon {
+      display: block;
+    margin-top: var(--sys-size-2);
+    }
+  }
+
+  .walkthrough-inline {
+    border-radius: var(--sys-shape-corner-full);
+    overflow: hidden;
+    width: fit-content;
+    max-width: 100%;
+
+    &[open] {
+      border-radius: var(--sys-size-5);
+      width: auto;
+      background-color: var(--sys-color-surface2);
+      margin-left: calc(var(--sys-size-6) / 2);
+      flex-grow: 1;
+    }
+  }
+
+  .walkthrough-inline > summary {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    background-color: transparent;
+    /* The same height as a DevTools Button */
+    height: var(--sys-size-11);
+    font: var(--sys-typescale-body4-regular);
+    font-weight:var(--ref-typeface-weight-medium);
+    user-select: none;
+    list-style: none; /* Hide default triangle */
+    justify-content: flex-start;
+    gap: var(--sys-size-4);
+    color: var(--sys-color-primary);
+    padding: 0 var(--sys-size-6);
+    overflow: hidden;
+
+    devtools-icon {
+      color: var(--sys-color-primary);
+    }
+
+    /* Align the summary to look like the tonal button */
+    &[data-has-widgets] {
+      background: var(--sys-color-tonal-container);
+      color: var(--sys-color-on-tonal-container);
+      border-radius: var(--sys-shape-corner-full);
+      margin-left: var(--sys-size-6);
+
+      devtools-icon {
+        color: var(--sys-color-on-tonal-container);
+      }
+    }
+
+    > .walkthrough-inline-title {
+      font: var(--sys-typescale-body4-regular);
+      font-weight: var(--ref-typeface-weight-medium);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    &:focus-visible {
+      outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+      outline-offset: calc(-1 * var(--sys-size-2));
+    }
+  }
+
+  .walkthrough-inline[open] > summary {
+    border-radius: var(--sys-shape-corner-medium-small);
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+    background: var(--sys-color-surface5);
+    color: var(--sys-color-on-surface);
+
+    &[data-has-widgets] {
+      margin-left: 0;
+    }
+
+    > devtools-icon[name='chevron-right'] {
+      transform: rotate(270deg);
+    }
+
+  }
+
+  .walkthrough-inline > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .walkthrough-inline > summary:hover {
+    background-color: var(--sys-color-state-hover-on-subtle);
+  }
+
+  .walkthrough-inline .steps-container {
+    padding: var(--sys-size-6);
+    border-top: var(--sys-size-1) solid var(--sys-color-divider);
+    background-color: transparent;
+  }
+
+  .walkthrough-inline > summary > devtools-icon[name='chevron-right'] {
+    width: var(--sys-size-8);
+    height: var(--sys-size-8);
+    transition: transform 0.2s;
+    margin-left: auto;
+  }
+
+  .walkthrough-inline .step {
+    background-color: var(--sys-color-surface5);
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/walkthroughView.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/WalkthroughView.js
+var lockedString2 = i18n3.i18n.lockedString;
+var { html: html5, render: render2, Directives: Directives4 } = Lit5;
+var { ref: ref2 } = Directives4;
+var SCROLL_ROUND_OFFSET = 2;
+var UIStrings2 = {
+  /**
+   * @description Title for the close button in the walkthrough view.
+   */
+  close: "Close",
+  /**
+   * @description Title for the walkthrough view.
+   */
+  title: "Agent walkthrough",
+  /**
+   * @description Title for the button that shows the walkthrough when there are no widgets in the walkthrough.
+   */
+  showThinking: "Show thinking",
+  /**
+   * @description Title for the button that shows the walkthrough when there are widgets in the walkthrough.
+   */
+  showAgentWalkthrough: "Show agent walkthrough",
+  /**
+   * @description Title for the button that hides the walkthrough when there are no widgets in the walkthrough.
+   */
+  hideThinking: "Hide thinking",
+  /**
+   * @description Title for the button that hides the walkthrough when there are widgets in the walkthrough.
+   */
+  hideAgentWalkthrough: "Hide agent walkthrough",
+  /**
+   * @description Aria label for the spinner to be read by screen reader when a step is in progress.
+   */
+  inProgress: "In progress"
+};
+var str_2 = i18n3.i18n.registerUIStrings("panels/ai_assistance/components/WalkthroughView.ts", UIStrings2);
+var i18nString2 = i18n3.i18n.getLocalizedString.bind(void 0, str_2);
+function walkthroughTitle(input) {
+  if (input.isLoading) {
+    return titleForStep(input.lastStep);
+  }
+  if (input.hasWidgets) {
+    return lockedString2(UIStrings2.showAgentWalkthrough);
+  }
+  return lockedString2(UIStrings2.showThinking);
+}
+function walkthroughCloseTitle(input) {
+  if (input.isInlined) {
+    return i18nString2(UIStrings2.title);
+  }
+  if (input.hasWidgets) {
+    return lockedString2(UIStrings2.hideAgentWalkthrough);
+  }
+  return lockedString2(UIStrings2.hideThinking);
+}
+function renderInlineWalkthrough(input, stepsOutput, allSteps) {
+  const lastStep = allSteps.at(-1);
+  if (!input.isInlined || !lastStep) {
+    return Lit5.nothing;
+  }
+  function onToggle(event) {
+    const isOpen = event.target.open;
+    if (!input.message) {
+      return;
+    }
+    if (isOpen) {
+      input.onOpen(input.message);
+    } else {
+      input.onToggle(isOpen, input.message);
+    }
+  }
+  const hasWidgets = allSteps.some((s) => s.widgets?.length);
+  const icon = AiAssistanceModel5.AiUtils.getIconName();
+  return html5`
+    <div class="inline-wrapper" ?data-open=${input.isExpanded} jslog=${VisualLogging2.section("walkthrough-container")}>
+      <span class="inline-icon">
+        ${input.isLoading ? html5`<devtools-spinner aria-label=${lockedString2(UIStrings2.inProgress)}></devtools-spinner>` : html5`<devtools-icon name=${icon}></devtools-icon>`}
+      </span>
+      <details class="walkthrough-inline" ?open=${input.isExpanded} @toggle=${onToggle} jslog=${VisualLogging2.expand("walkthrough").track({ click: true })}>
+        <summary
+          ?data-has-widgets=${!input.isLoading && hasWidgets}
+          aria-label=${getButtonLabel({
+    isExpanded: input.isExpanded,
+    isLoading: input.isLoading,
+    hasWidgets,
+    prompt: input.prompt,
+    stepTitle: titleForStep(lastStep)
+  })}
+        >
+          <h2 class="walkthrough-inline-title">
+            ${input.isExpanded ? walkthroughCloseTitle({ hasWidgets, isInlined: true }) : walkthroughTitle({ isLoading: input.isLoading, lastStep, hasWidgets })}
+          </h2>
+          <devtools-icon name="chevron-right"></devtools-icon>
+        </summary>
+
+        ${stepsOutput}
+      </details>
+    </div>
+  `;
+}
+function renderSidebarWalkthrough(input, stepsOutput, stepsCount) {
+  if (input.isInlined) {
+    return Lit5.nothing;
+  }
+  return html5`
+    <div class="walkthrough-view" jslog=${VisualLogging2.section("walkthrough-container")}>
+      <div class="walkthrough-header">
+         <h2 class="walkthrough-title">${i18nString2(UIStrings2.title)}</h2>
+         <devtools-button
+          .data=${{
+    variant: "toolbar",
+    iconName: "cross",
+    title: i18nString2(UIStrings2.close),
+    jslogContext: "close-walkthrough"
+  }}
+          @click=${() => {
+    if (input.message) {
+      input.onToggle(false, input.message);
+    }
+  }}
+        ></devtools-button>
+      </div>
+      ${stepsOutput}
+      ${stepsCount === 0 ? html5`
+        <div class="empty-state">
+          <p>No walkthrough steps available yet.</p>
+        </div>
+      ` : Lit5.nothing}
+    </div>
+  `;
+}
+var DEFAULT_VIEW2 = (input, output, target) => {
+  const allSteps = input.message?.parts.filter((t) => t.type === "step")?.map((p) => p.step) ?? [];
+  const renderableSteps = allSteps.filter((s) => s.state.type !== "needs_approval");
+  const stepsOutput = renderableSteps.length > 0 ? html5`
+    <div class="steps-container" @scroll=${input.handleScroll} ${ref2((el) => {
+    output.scrollContainer = el;
+  })}>
+      <div class="steps-scroll-content" ${ref2((el) => {
+    output.stepsContainer = el;
+  })}>
+        ${renderableSteps.map((step, index) => html5`
+          <div class="walkthrough-step">
+            <span class="step-number">${index + 1}</span>
+            <div class="step-wrapper">
+              ${renderStep({
+    step,
+    markdownRenderer: input.markdownRenderer,
+    isLast: index === renderableSteps.length - 1
+  })}
+            </div>
+          </div>
+        `)}
+      </div>
+    </div>
+  ` : Lit5.nothing;
+  render2(html5`
+    <style>
+      ${Input2.textInputStyles}
+      ${chatMessage_css_default}
+      ${walkthroughView_css_default}
+    </style>
+    ${input.isInlined ? renderInlineWalkthrough(input, stepsOutput, allSteps) : renderSidebarWalkthrough(input, stepsOutput, renderableSteps.length)}`, target);
+};
+var WalkthroughView = class extends UI2.Widget.Widget {
+  #view;
+  #message = null;
+  #isLoading = false;
+  #markdownRenderer = null;
+  #onToggle = () => {
+  };
+  #onOpen = () => {
+  };
+  #isInlined = false;
+  #isExpanded = false;
+  #prompt = "";
+  #pinScrollToBottom = true;
+  #isProgrammaticScroll = false;
+  #output = {};
+  #stepsContainerResizeObserver = new ResizeObserver(() => this.#handleStepsContainerResize());
+  #lastStepsContainerWidth = 0;
+  constructor(element, view = DEFAULT_VIEW2) {
+    super(element);
+    this.#view = view;
+    this.setMinimumSize(330, 0);
+  }
+  wasShown() {
+    super.wasShown();
+    this.#registerResizeObservers();
+  }
+  willHide() {
+    super.willHide();
+    this.#stepsContainerResizeObserver.disconnect();
+  }
+  #registerResizeObservers() {
+    if (this.#output.stepsContainer) {
+      this.#stepsContainerResizeObserver.observe(this.#output.stepsContainer);
+    }
+  }
+  #handleStepsContainerResize() {
+    const width = this.#output.stepsContainer?.offsetWidth ?? 0;
+    if (width !== this.#lastStepsContainerWidth) {
+      this.#lastStepsContainerWidth = width;
+      return;
+    }
+    if (!this.#pinScrollToBottom || !this.#isLoading) {
+      return;
+    }
+    this.scrollToBottom();
+  }
+  scrollToBottom() {
+    if (!this.#output.stepsContainer) {
+      return;
+    }
+    this.#isProgrammaticScroll = true;
+    window.requestAnimationFrame(() => {
+      const lastElement = this.#output.stepsContainer?.lastElementChild;
+      if (lastElement) {
+        lastElement.scrollIntoView({
+          behavior: "smooth",
+          block: "end"
+        });
+      }
+    });
+  }
+  #handleScroll = (ev) => {
+    if (!ev.target || !(ev.target instanceof HTMLElement)) {
+      return;
+    }
+    if (this.#isProgrammaticScroll) {
+      const isAtBottom = ev.target.scrollTop + ev.target.clientHeight + SCROLL_ROUND_OFFSET >= ev.target.scrollHeight;
+      if (isAtBottom) {
+        this.#isProgrammaticScroll = false;
+      }
+      return;
+    }
+    this.#pinScrollToBottom = ev.target.scrollTop + ev.target.clientHeight + SCROLL_ROUND_OFFSET >= ev.target.scrollHeight;
+  };
+  set isLoading(isLoading) {
+    this.#isLoading = isLoading;
+    this.requestUpdate();
+  }
+  get isLoading() {
+    return this.#isLoading;
+  }
+  get markdownRenderer() {
+    return this.#markdownRenderer;
+  }
+  set markdownRenderer(markdownRenderer) {
+    this.#markdownRenderer = markdownRenderer;
+    this.requestUpdate();
+  }
+  get message() {
+    return this.#message;
+  }
+  get onOpen() {
+    return this.#onOpen;
+  }
+  set onOpen(onOpen) {
+    this.#onOpen = onOpen;
+    this.requestUpdate();
+  }
+  set message(message) {
+    this.#message = message;
+    this.requestUpdate();
+  }
+  set onToggle(onToggle) {
+    this.#onToggle = onToggle;
+    this.requestUpdate();
+  }
+  set isInlined(isInlined) {
+    this.#isInlined = isInlined;
+    this.requestUpdate();
+  }
+  set isExpanded(isExpanded) {
+    this.#isExpanded = isExpanded;
+    this.requestUpdate();
+  }
+  get prompt() {
+    return this.#prompt;
+  }
+  set prompt(prompt) {
+    this.#prompt = prompt;
+    this.requestUpdate();
+  }
+  performUpdate() {
+    if (!this.#markdownRenderer) {
+      return;
+    }
+    const message = this.#message ? getDeduplicatedWidgetsMessage(this.#message) : null;
+    this.#view({
+      isLoading: this.#isLoading,
+      markdownRenderer: this.#markdownRenderer,
+      onToggle: this.#onToggle,
+      onOpen: this.#onOpen,
+      isInlined: this.#isInlined,
+      isExpanded: this.#isExpanded,
+      prompt: this.#prompt,
+      message,
+      handleScroll: this.#handleScroll
+    }, this.#output, this.contentElement);
+    this.#registerResizeObservers();
+    if (this.#pinScrollToBottom && this.#isLoading) {
+      this.scrollToBottom();
+    }
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/ChatMessage.js
+var { html: html6, Directives: { ref: ref3, ifDefined } } = Lit6;
+var lockedString3 = i18n5.i18n.lockedString;
+var { widget: widget2 } = UI3.Widget;
+var REPORT_URL = "https://crbug.com/508304827";
+var SCROLL_ROUNDING_OFFSET = 1;
+var UIStringsNotTranslate2 = {
+  /**
+   * @description The title of the button that allows submitting positive
+   * feedback about the response for AI assistance.
+   */
+  thumbsUp: "Good response",
+  /**
+   * @description The title of the button that allows submitting negative
+   * feedback about the response for AI assistance.
+   */
+  thumbsDown: "Bad response",
+  /**
+   * @description The placeholder text for the feedback input.
+   */
+  provideFeedbackPlaceholder: "Provide additional feedback",
+  /**
+   * @description The disclaimer text that tells the user what will be shared
+   * and what will be stored.
+   */
+  disclaimer: "Submitted feedback will also include your conversation",
+  /**
+   * @description The button text for the action of submitting feedback.
+   */
+  submit: "Submit",
+  /**
+   * @description The header of the feedback form asking.
+   */
+  whyThisRating: "Why did you choose this rating? (optional)",
+  /**
+   * @description The button text for the action that hides the feedback form.
+   */
+  close: "Close",
+  /**
+   * @description The title of the button that opens a page to report a legal
+   * issue with the AI assistance message.
+   */
+  report: "Report legal issue",
+  /**
+   * @description The title of the button for scrolling to see next suggestions
+   */
+  scrollToNext: "Scroll to next suggestions",
+  /**
+   * @description The title of the button for scrolling to see previous suggestions
+   */
+  scrollToPrevious: "Scroll to previous suggestions",
+  /**
+   * @description The error message when the request to the LLM failed for some reason.
+   */
+  systemError: "Something unforeseen happened and I can no longer continue. Try your request again and see if that resolves the issue. If this keeps happening, update Chrome to the latest version.",
+  /**
+   * @description The error message when the user is out of quota or rate limited.
+   */
+  quotaError: "You reached your limit for AI assistance requests. Try again later.",
+  /**
+   * @description The error message when the LLM gets stuck in a loop (max steps reached).
+   */
+  maxStepsError: "Seems like I am stuck with the investigation. It would be better if you start over.",
+  /**
+   * @description The error message when the LLM selects context from a different origin.
+   */
+  crossOriginError: "I have selected the new context but you will have to start a new chat.",
+  /**
+   * @description The error message when the request payload is too large.
+   */
+  payloadTooLargeError: "The request payload is too large. Please try a smaller image or a screenshot.",
+  /**
+   * @description Displayed when the user stop the response
+   */
+  stoppedResponse: "You stopped this response",
+  /**
+   * @description Button text that confirm code execution that may affect the page.
+   */
+  confirmActionRequestApproval: "Continue",
+  /**
+   * @description Button text that cancels code execution that may affect the page.
+   */
+  declineActionRequestApproval: "Cancel",
+  /**
+   * @description The fallback text when a step has no title yet
+   */
+  investigating: "Investigating",
+  /**
+   * @description Prefix to the title of each thinking step of a user action is required to continue
+   */
+  paused: "Paused",
+  /**
+   * @description Heading text for the code block that shows the executed code.
+   */
+  codeExecuted: "Code executed",
+  /**
+   * @description Heading text for the code block that shows the code to be executed after side effect confirmation.
+   */
+  codeToExecute: "Code to execute",
+  /**
+   * @description Heading text for the code block that shows the returned data.
+   */
+  dataReturned: "Data returned",
+  /**
+   * @description Aria label for the check mark icon to be read by screen reader
+   */
+  completed: "Completed",
+  /**
+   * @description Aria label for the spinner to be read by screen reader when a step is in progress.
+   */
+  inProgress: "In progress",
+  /**
+   * @description Aria label for the aborted icon to be read by screen reader
+   */
+  aborted: "Aborted",
+  /**
+   * @description Alt text for the image input (displayed in the chat messages) that has been sent to the model.
+   */
+  imageInputSentToTheModel: "Image input sent to the model",
+  /**
+   * @description Title for the link which wraps the image input rendered in chat messages.
+   */
+  openImageInNewTab: "Open image in a new tab",
+  /**
+   * @description Alt text for image when it is not available.
+   */
+  imageUnavailable: "Image unavailable",
+  /**
+   * @description Title for the button that takes the user into other DevTools panels to reveal items the AI references.
+   */
+  reveal: "Reveal",
+  /**
+   * @description Title used for revealing the performance trace.
+   */
+  revealTrace: "Reveal trace",
+  /**
+   * @description Accessible label for the reveal button in the computed styles widget.
+   */
+  revealComputedStyles: "Reveal computed styles",
+  /**
+   * @description Accessible label for the reveal button in the core web vitals widget.
+   */
+  revealCoreWebVitals: "Reveal Core Web Vitals",
+  /**
+   * @description Accessible label for the reveal button in the style properties widget.
+   */
+  revealStyleProperties: "Reveal style properties",
+  /**
+   * @description Accessible label for the reveal button in the LCP breakdown widget.
+   */
+  revealLcpBreakdown: "Reveal LCP breakdown",
+  /**
+   * @description Accessible label for the reveal button in the LCP discovery widget.
+   */
+  revealLcpDiscovery: "Reveal LCP discovery",
+  /**
+   * @description Accessible label for the reveal button in the layout shift culprits widget.
+   */
+  revealClsCulprits: "Reveal layout shift culprits",
+  /**
+   * @description Accessible label for the reveal button in the render-blocking requests widget.
+   */
+  revealRenderBlockingBreakdown: "Reveal render-blocking requests",
+  /**
+   * @description Accessible label for the reveal button in the performance summary widget.
+   */
+  revealPerformanceSummary: "Reveal performance summary",
+  /**
+   * @description Accessible label for the reveal button in the network track widget.
+   */
+  revealNetworkActivity: "Reveal network activity",
+  /**
+   * @description Accessible label for the reveal button in the bottom up thread activity widget.
+   */
+  revealBottomUpTree: "Reveal bottom-up thread activity",
+  /**
+   * @description Accessible label for the reveal button in the network dependency tree widget.
+   */
+  revealNetworkDependencyTree: "Reveal network dependency tree",
+  /**
+   * @description Accessible label for the reveal button in the 3rd parties widget.
+   */
+  revealThirdParties: "Reveal 3rd parties",
+  /**
+   * @description Title for the core web vitals widget.
+   */
+  coreVitals: "Core Web Vitals",
+  /**
+   * @description Title for the Lighthouse report widget.
+   */
+  lighthouseReport: "Lighthouse report",
+  /**
+   * @description Accessible label for the reveal button in the Lighthouse report widget.
+   */
+  revealLighthouse: "Reveal Lighthouse report",
+  /**
+   * @description Title for the Timeline event summary widget.
+   */
+  timelineEventSummary: "Event summary",
+  /**
+   * @description Accessible label for the reveal button in the Timeline event summary widget.
+   */
+  revealTimelineEventSummary: "Reveal event",
+  /**
+   * @description Title for the LCP breakdown widget.
+   */
+  lcpBreakdown: "LCP breakdown",
+  /**
+   * @description Title for the LCP discovery widget.
+   */
+  lcpDiscovery: "LCP discovery",
+  /**
+   * @description Title for the layout shift culprits widget.
+   */
+  clsCulprits: "Layout shift culprits",
+  /**
+   * @description Title for the render-blocking requests widget.
+   */
+  renderBlockingBreakdown: "Render-blocking requests",
+  /**
+   * @description Title for the network dependency tree widget.
+   */
+  networkDependencyTree: "Network dependency tree",
+  /**
+   * @description Title for the 3rd parties widget.
+   */
+  thirdParties: "3rd parties",
+  /**
+   * @description Title for the performance summary widget.
+   */
+  performanceSummary: "Performance summary",
+  /**
+   * @description Title for the network activity summary widget.
+   */
+  networkActivitySummary: "Network activity",
+  /**
+   * @description The title of the button that allows exporting the conversation for agents.
+   */
+  exportForAgents: "Copy to coding agent",
+  /**
+   * @description Title for the bottom up thread activity widget.
+   */
+  bottomUpTree: "Bottom-up thread activity",
+  /**
+   * @description Accessible label for the reveal button in the forced reflow widget.
+   */
+  revealForcedReflow: "Reveal forced reflow",
+  /**
+   * @description Title for the forced reflow widget.
+   */
+  forcedReflow: "Forced reflow",
+  /**
+   * @description Accessible label for the reveal button in the cache widget.
+   */
+  revealCache: "Reveal efficient cache lifetimes",
+  /**
+   * @description Title for the cache widget.
+   */
+  cache: "Efficient cache lifetimes",
+  /**
+   * @description Accessible label for the reveal button in the INP breakdown widget.
+   */
+  revealInpBreakdown: "Reveal INP breakdown",
+  /**
+   * @description Title for the INP breakdown widget.
+   */
+  inpBreakdown: "INP breakdown",
+  /**
+   * @description Accessible label for the reveal button in the document latency widget.
+   */
+  revealDocumentLatency: "Reveal document latency",
+  /**
+   * @description Title for the document latency widget.
+   */
+  documentLatency: "Document latency",
+  /**
+   * @description Accessible label for the reveal button in the DOM size widget.
+   */
+  revealDomSize: "Reveal DOM size",
+  /**
+   * @description Title for the DOM size widget.
+   */
+  domSize: "DOM size",
+  /**
+   * @description Accessible label for the reveal button in the duplicated JavaScript widget.
+   */
+  revealDuplicateJavaScript: "Reveal duplicated JavaScript",
+  /**
+   * @description Title for the duplicated JavaScript widget.
+   */
+  duplicateJavaScript: "Duplicated JavaScript",
+  /**
+   * @description Accessible label for the reveal button in the image delivery widget.
+   */
+  revealImageDelivery: "Reveal image delivery",
+  /**
+   * @description Title for the image delivery widget.
+   */
+  imageDelivery: "Image delivery",
+  /**
+   * @description Accessible label for the reveal button in the font display widget.
+   */
+  revealFontDisplay: "Reveal font display",
+  /**
+   * @description Title for the font display widget.
+   */
+  fontDisplay: "Font display",
+  /**
+   * @description Accessible label for the reveal button in the slow CSS selectors widget.
+   */
+  revealSlowCssSelector: "Reveal slow CSS selectors",
+  /**
+   * @description Title for the slow CSS selectors widget.
+   */
+  slowCssSelector: "Slow CSS selectors",
+  /**
+   * @description Accessible label for the reveal button in the legacy JavaScript widget.
+   */
+  revealLegacyJavaScript: "Reveal legacy JavaScript",
+  /**
+   * @description Title for the legacy JavaScript widget.
+   */
+  legacyJavaScript: "Legacy JavaScript",
+  /**
+   * @description Accessible label for the reveal button in the viewport optimization widget.
+   */
+  revealViewport: "Reveal viewport optimization",
+  /**
+   * @description Title for the viewport optimization widget.
+   */
+  viewport: "Viewport optimization",
+  /**
+   * @description Accessible label for the reveal button in the network request general headers widget.
+   */
+  revealNetworkRequest: "Reveal network request",
+  /**
+   * @description Title for the network request general headers widget.
+   */
+  networkRequest: "Network request",
+  /**
+   * @description Accessible label for the reveal button in the modern HTTP usage widget.
+   */
+  revealModernHttp: "Reveal modern HTTP usage",
+  /**
+   * @description Title for the modern HTTP usage widget.
+   */
+  modernHttp: "Modern HTTP usage",
+  /**
+   * @description Accessible label for the reveal button in the character set declaration widget.
+   */
+  revealCharacterSet: "Reveal character set declaration",
+  /**
+   * @description Title for the character set declaration widget.
+   */
+  characterSet: "Character set declaration",
+  /**
+   * @description Title for the network requests list widget.
+   */
+  networkRequests: "Network requests",
+  /**
+   * @description Accessible label for the reveal button in the network requests list widget.
+   */
+  revealFirstNetworkRequest: "Reveal first network request in Network panel",
+  /**
+   * @description Title for the source files list widget.
+   */
+  inspectedFileNames: "Inspected file names",
+  /**
+   * @description Title for the storage breakdown widget.
+   */
+  storageBreakdown: "Storage breakdown",
+  /**
+   * @description Accessible label for the reveal button in the storage breakdown widget.
+   */
+  revealStorageBreakdown: "Reveal storage breakdown in Application panel"
+};
+var ChatMessageEntity;
+(function(ChatMessageEntity2) {
+  ChatMessageEntity2["MODEL"] = "model";
+  ChatMessageEntity2["USER"] = "user";
+})(ChatMessageEntity || (ChatMessageEntity = {}));
+var DEFAULT_VIEW3 = (input, output, target) => {
+  const message = input.message;
+  if (message.entity === "user") {
+    const imageInput = message.imageInput && "inlineData" in message.imageInput ? renderImageChatMessage(message.imageInput.inlineData) : Lit6.nothing;
+    const messageClasses2 = Lit6.Directives.classMap({
+      "chat-message": true,
+      query: true,
+      "is-last-message": input.isLastMessage,
+      "is-first-message": input.isFirstMessage
+    });
+    Lit6.render(html6`
+      <style>${Input3.textInputStyles}</style>
+      <style>${chatMessage_css_default}</style>
+      <div class="user-query-wrapper">
+        <section class=${messageClasses2} jslog=${VisualLogging3.section("question")}>
+          ${imageInput}
+          <div class="message-content">${renderTextAsMarkdown(message.text, input.markdownRenderer)}</div>
+        </section>
+      </div>
+    `, target);
+    return;
+  }
+  const steps = message.parts.filter((part) => part.type === "step").map((part) => part.step);
+  const messageClasses = Lit6.Directives.classMap({
+    "chat-message": true,
+    answer: true,
+    "is-last-message": input.isLastMessage,
+    "is-first-message": input.isFirstMessage
+  });
+  Lit6.render(html6`
+    <style>${Input3.textInputStyles}</style>
+    <style>${chatMessage_css_default}</style>
+    <section class=${messageClasses} jslog=${VisualLogging3.section("answer")}>
+      ${renderWalkthroughUI(input, steps)}
+      <div class="answer-body-wrapper">
+        ${Lit6.Directives.repeat(message.parts, (_, index) => index, (part, index) => {
+    const isLastPart = index === message.parts.length - 1;
+    if (part.type === "answer") {
+      return html6`<p>${renderTextAsMarkdown(part.text, input.markdownRenderer, { animate: !input.isReadOnly && input.isLoading && isLastPart && input.isLastMessage })}</p>`;
+    }
+    if (part.type === "widget") {
+      return html6`${Lit6.Directives.until(renderWidgets(part.widgets, { wrapperClass: "main-widgets-wrapper" }))}`;
+    }
+    return Lit6.nothing;
+  })}
+        ${renderError(message)}
+        ${input.showActions ? renderActions(input, output) : Lit6.nothing}
+      </div>
+      ${renderSideEffectStepsUI(input, steps)}
+    </section>
+  `, target);
+};
+function renderTextAsMarkdown(text, markdownRenderer, { animate, ref: refFn } = {}) {
+  let tokens = [];
+  try {
+    tokens = Marked.Marked.lexer(text);
+    for (const token of tokens) {
+      markdownRenderer.renderToken(token);
+    }
+  } catch {
+    return html6`${text}`;
+  }
+  return html6`<devtools-markdown-view
+    .data=${{ tokens, renderer: markdownRenderer, animationEnabled: animate }}
+    ${refFn ? ref3(refFn) : Lit6.nothing}>
+  </devtools-markdown-view>`;
+}
+function titleForStep(step) {
+  return step.title ?? `${lockedString3(UIStringsNotTranslate2.investigating)}\u2026`;
+}
+function renderTitle(step) {
+  const paused = step.state.type === "needs_approval" ? html6`<span class="paused">${lockedString3(UIStringsNotTranslate2.paused)}: </span>` : Lit6.nothing;
+  return html6`<h3 class="title" aria-label=${titleForStep(step)}>${paused}${titleForStep(step)}</h3>`;
+}
+function renderStepCode(step) {
+  if (!step.code && !step.output) {
+    return Lit6.nothing;
+  }
+  const codeHeadingText = step.output && step.state.type !== "canceled" ? lockedString3(UIStringsNotTranslate2.codeExecuted) : lockedString3(UIStringsNotTranslate2.codeToExecute);
+  const code = step.code ? html6`<div class="action-result">
+      <devtools-code-block
+        .code=${step.code.trim()}
+        .codeLang=${"js"}
+        .displayNotice=${!Boolean(step.output)}
+        .header=${codeHeadingText}
+        .showCopyButton=${true}
+      ></devtools-code-block>
+  </div>` : Lit6.nothing;
+  const output = step.output ? html6`<div class="js-code-output">
+    <devtools-code-block
+      .code=${step.output}
+      .codeLang=${"js"}
+      .displayNotice=${true}
+      .header=${lockedString3(UIStringsNotTranslate2.dataReturned)}
+      .showCopyButton=${false}
+    ></devtools-code-block>
+  </div>` : Lit6.nothing;
+  return html6`<div class="step-code">${code}${output}</div>`;
+}
+function renderStepDetails({ step, markdownRenderer, isLast }) {
+  const sideEffects = isLast && step.state.type === "needs_approval" ? renderSideEffectConfirmationUi(step) : Lit6.nothing;
+  const thought = step.thought ? html6`<p>${renderTextAsMarkdown(step.thought, markdownRenderer)}</p>` : Lit6.nothing;
+  const contextDetails = step.contextDetails ? html6`${Lit6.Directives.repeat(step.contextDetails, (contextDetail) => {
+    return html6`<div class="context-details">
+      <devtools-code-block
+        .code=${contextDetail.text}
+        .codeLang=${contextDetail.codeLang || ""}
+        .displayNotice=${false}
+        .header=${contextDetail.title}
+        .showCopyButton=${true}
+      ></devtools-code-block>
+    </div>`;
+  })}` : Lit6.nothing;
+  return html6`<div class="step-details">
+    ${thought}
+    ${renderStepCode(step)}
+    ${sideEffects}
+    ${contextDetails}
+  </div>`;
+}
+function renderWalkthroughSidebarButton(input, steps) {
+  const { message, walkthrough } = input;
+  const lastStep = steps.at(-1);
+  if (walkthrough.isInlined || !lastStep) {
+    return Lit6.nothing;
+  }
+  const hasOneStepWithWidget = steps.some((step) => step.widgets?.length);
+  const isExpanded = walkthrough.isExpanded && input.message.id === input.walkthrough.activeSidebarMessage?.id;
+  const title = isExpanded ? walkthroughCloseTitle({ hasWidgets: hasOneStepWithWidget }) : walkthroughTitle({
+    isLoading: input.isLoading,
+    hasWidgets: hasOneStepWithWidget,
+    lastStep
+  });
+  const variant = hasOneStepWithWidget && !input.isLoading ? "tonal" : "text";
+  const icon = AiAssistanceModel6.AiUtils.getIconName();
+  const toggleContainerClasses = Lit6.Directives.classMap({
+    "walkthrough-toggle-container": true,
+    // We only apply the widget styling when loading is complete
+    "has-widgets": hasOneStepWithWidget && !input.isLoading
+  });
+  const accessibleLabel = getButtonLabel({
+    isExpanded,
+    isLoading: input.isLoading,
+    hasWidgets: hasOneStepWithWidget,
+    prompt: input.prompt,
+    stepTitle: titleForStep(lastStep)
+  });
+  return html6`
+    <div class=${toggleContainerClasses}>
+      ${input.isLoading ? html6`<devtools-spinner></devtools-spinner>` : html6`<devtools-icon name=${icon}></devtools-icon>`}
+      <devtools-button
+        .variant=${variant}
+        .size=${"SMALL"}
+        .title=${lastStep.state.type === "in_progress" ? titleForStep(lastStep) : title}
+        .accessibleLabel=${accessibleLabel}
+        .jslogContext=${walkthrough.isExpanded ? "ai-hide-walkthrough-sidebar" : "ai-show-walkthrough-sidebar"}
+        data-show-walkthrough
+        @click=${() => {
+    if (walkthrough.activeSidebarMessage?.id === input.message.id && walkthrough.isExpanded) {
+      walkthrough.onToggle(false, message);
+    } else {
+      walkthrough.onOpen(message);
+    }
+  }}>${title}<devtools-icon class="chevron" .name=${isExpanded ? "cross" : "chevron-right"}></devtools-icon>
+      </devtools-button>
+    </div>
+  `;
+}
+function renderWalkthroughUI(input, steps) {
+  const lastStep = steps.at(-1);
+  if (!lastStep) {
+    return Lit6.nothing;
+  }
+  const openWalkThroughSidebarButton = !input.walkthrough.isInlined ? renderWalkthroughSidebarButton(input, steps) : Lit6.nothing;
+  const isExpanded = input.walkthrough.isInlined ? input.walkthrough.inlineExpandedMessages.some((m) => m.id === input.message.id) : input.walkthrough.isExpanded && input.walkthrough.activeSidebarMessage?.id === input.message.id;
+  const walkthroughInline = input.walkthrough.isInlined ? html6`
+    <div class="walkthrough-container">
+      ${widget2(WalkthroughView, {
+    message: input.message,
+    isLoading: input.isLoading && input.isLastMessage,
+    markdownRenderer: input.markdownRenderer,
+    isInlined: true,
+    isExpanded,
+    prompt: input.prompt,
+    onToggle: input.walkthrough.onToggle,
+    onOpen: input.walkthrough.onOpen
+  })}
+    </div>
+  ` : Lit6.nothing;
+  return html6`
+    ${openWalkThroughSidebarButton}
+    ${walkthroughInline}
+  `;
+}
+function renderSideEffectStepsUI(input, steps) {
+  const sideEffectSteps = steps.filter((s) => s.state.type === "needs_approval" || s.state.type === "canceled");
+  if (sideEffectSteps.length === 0) {
+    return Lit6.nothing;
+  }
+  return html6`
+    ${sideEffectSteps.map((step) => html6`
+      <div class="side-effect-container">
+        ${renderStep({
+    step,
+    markdownRenderer: input.markdownRenderer,
+    isLast: true
+  })}
+      </div> `)}
+  `;
+}
+function renderStepBadge({ step, isLast }) {
+  if (isLast && step.state.type === "in_progress") {
+    return html6`<devtools-spinner aria-label=${lockedString3(UIStringsNotTranslate2.inProgress)}></devtools-spinner>`;
+  }
+  let iconName = "checkmark";
+  let ariaLabel = lockedString3(UIStringsNotTranslate2.completed);
+  let role = "button";
+  if (step.state.type === "needs_approval") {
+    if (!isLast) {
+      console.error("A step in needs_approval state must be the last step.");
+    }
+    role = void 0;
+    ariaLabel = lockedString3(UIStringsNotTranslate2.paused);
+    iconName = "pause-circle";
+  } else if (step.state.type === "canceled") {
+    ariaLabel = lockedString3(UIStringsNotTranslate2.aborted);
+    iconName = "cross";
+  }
+  return html6`<devtools-icon
+      class="indicator"
+      role=${ifDefined(role)}
+      aria-label=${ifDefined(ariaLabel)}
+      .name=${iconName}
+    ></devtools-icon>`;
+}
+function renderStep({ step, markdownRenderer, isLast }) {
+  const stepClasses = Lit6.Directives.classMap({
+    step: true,
+    empty: !step.thought && !step.code && !step.contextDetails && step.state.type !== "needs_approval",
+    paused: step.state.type === "needs_approval",
+    canceled: step.state.type === "canceled"
+  });
+  return html6`
+    <details class=${stepClasses}
+      jslog=${VisualLogging3.expand("step").track({ click: true })}
+      .open=${step.state.type === "needs_approval"}>
+      <summary>
+        <div class="summary">
+          ${renderStepBadge({ step, isLast })}
+          ${renderTitle(step)}
+          <devtools-icon
+            class="arrow"
+            name="chevron-down"
+          ></devtools-icon>
+        </div>
+      </summary>
+      ${renderStepDetails({ step, markdownRenderer, isLast })}
+    </details>
+    ${Lit6.Directives.until(renderWidgets(step.widgets, { wrapperClass: "step-widgets-wrapper" }))}
+    `;
+}
+var nodeCache = /* @__PURE__ */ new Map();
+async function resolveNode(backendNodeId) {
+  const cachedNode = nodeCache.get(backendNodeId);
+  if (cachedNode) {
+    return cachedNode;
+  }
+  const target = SDK4.TargetManager.TargetManager.instance().primaryPageTarget();
+  if (!target) {
+    return null;
+  }
+  const node = new SDK4.DOMModel.DeferredDOMNode(target, backendNodeId);
+  const resolved = await node.resolvePromise();
+  if (resolved) {
+    nodeCache.set(backendNodeId, resolved);
+  }
+  return resolved;
+}
+async function makeStorageBreakdownWidget(widgetData) {
+  const target = SDK4.TargetManager.TargetManager.instance().primaryPageTarget();
+  if (!target) {
+    return null;
+  }
+  const breakdown = widgetData.data.usageBreakdown;
+  const total = breakdown.reduce((sum, item) => sum + item.bytes, 0);
+  const slices = breakdown.map((item) => {
+    const color = Application.StorageView.storagePieColors.get(item.storageType) || "rgb(180, 180, 180)";
+    const title = Application.StorageView.StorageView.getStorageTypeNameForWidget(item.storageType);
+    return {
+      value: item.bytes,
+      color,
+      title
+    };
+  });
+  const chartData = {
+    chartName: lockedString3(UIStringsNotTranslate2.storageBreakdown),
+    size: 110,
+    formatter: (val) => AiAssistanceModel6.UnitFormatters.bytes(val),
+    showLegend: true,
+    total,
+    slices
+  };
+  const renderedWidget = html6`
+    <div class="storage-breakdown-widget">
+      <devtools-perf-piechart .data=${chartData}></devtools-perf-piechart>
+    </div>
+  `;
+  return {
+    renderedWidget,
+    title: lockedString3(UIStringsNotTranslate2.storageBreakdown),
+    revealable: new Application.StorageView.StorageRevealable(target),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealStorageBreakdown),
+    jslogContext: "storage-breakdown-widget"
+  };
+}
+async function makeComputedStyleWidget(widgetData) {
+  const domNodeForId = await resolveNode(widgetData.data.backendNodeId);
+  if (!domNodeForId) {
+    return null;
+  }
+  const styles = new ComputedStyle.ComputedStyleModel.ComputedStyle(domNodeForId, widgetData.data.computedStyles);
+  let filterText = null;
+  try {
+    filterText = new RegExp(widgetData.data.properties.join("|"), "i");
+  } catch {
+    return null;
+  }
+  const renderedWidget = html6`<devtools-widget
+      class="computed-styles-widget" ${widget2(Elements.ComputedStyleWidget.ComputedStyleWidget, {
+    nodeStyle: styles,
+    matchedStyles: widgetData.data.matchedCascade,
+    // This disables showing the nested traces and detailed information in the widget.
+    propertyTraces: null,
+    allowUserControl: false,
+    filterText,
+    enableNarrowViewResizing: false
+  })}></devtools-widget>`;
+  return {
+    renderedWidget,
+    revealable: new Elements.ElementsPanel.NodeComputedStyles(domNodeForId),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealComputedStyles),
+    // clang-format off
+    title: html6`
+      <span class="computed-style-title-wrapper">
+        <span class="computed-style-title-prefix">Computed styles</span>
+        <span class="style-class-wrapper">
+          (<devtools-widget
+            ${widget2(PanelsCommon4.DOMLinkifier.DOMNodeLink, {
+      node: domNodeForId
+    })}
+          ></devtools-widget>)
+        </span>
+      </span>`,
+    // clang-format on
+    jslogContext: "computed-styles"
+  };
+}
+async function makeCoreWebVitalsWidget(widgetData) {
+  const renderedWidget = html6`<devtools-widget class="core-vitals-widget" ${widget2(TimelineComponents.CWVMetrics.CWVMetrics, { data: widgetData.data, skipBottomBorder: true })}>
+  </devtools-widget>`;
+  return {
+    renderedWidget,
+    revealable: new TimelineUtils.Helpers.RevealableCoreVitals(widgetData.data.insightSetKey),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealCoreWebVitals),
+    title: lockedString3(UIStringsNotTranslate2.coreVitals),
+    jslogContext: "core-web-vitals"
+  };
+}
+async function makeStylePropertiesWidget(widgetData) {
+  const domNodeForId = await resolveNode(widgetData.data.backendNodeId);
+  if (!domNodeForId) {
+    return null;
+  }
+  let filter = null;
+  try {
+    filter = widgetData.data.selector ? new RegExp(widgetData.data.selector) : null;
+  } catch {
+    return null;
+  }
+  const renderedWidget = html6`<devtools-widget
+      class="styling-preview-widget"
+      ${widget2(Elements.StandaloneStylesContainer.StandaloneStylesContainer, {
+    domNode: domNodeForId,
+    filter
+  })}>
+  </devtools-widget>`;
+  return {
+    renderedWidget,
+    revealable: domNodeForId,
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealStyleProperties),
+    title: html6`<devtools-widget
+      ${widget2(PanelsCommon4.DOMLinkifier.DOMNodeLink, {
+      node: domNodeForId
+    })}
+    ></devtools-widget>`,
+    jslogContext: "standalone-styles"
+  };
+}
+var INSIGHT_METADATA = {
+  [Trace2.Insights.Types.InsightKeys.LCP_BREAKDOWN]: {
+    component: TimelineInsights.LCPBreakdown.LCPBreakdown,
+    accessibleLabel: UIStringsNotTranslate2.revealLcpBreakdown,
+    title: UIStringsNotTranslate2.lcpBreakdown,
+    jslog: "lcp-breakdown-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.RENDER_BLOCKING]: {
+    component: TimelineInsights.RenderBlocking.RenderBlocking,
+    accessibleLabel: UIStringsNotTranslate2.revealRenderBlockingBreakdown,
+    title: UIStringsNotTranslate2.renderBlockingBreakdown,
+    jslog: "render-blocking-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.LCP_DISCOVERY]: {
+    component: TimelineInsights.LCPDiscovery.LCPDiscovery,
+    accessibleLabel: UIStringsNotTranslate2.revealLcpDiscovery,
+    title: UIStringsNotTranslate2.lcpDiscovery,
+    jslog: "lcp-discovery-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.CLS_CULPRITS]: {
+    component: TimelineInsights.CLSCulprits.CLSCulprits,
+    accessibleLabel: UIStringsNotTranslate2.revealClsCulprits,
+    title: UIStringsNotTranslate2.clsCulprits,
+    jslog: "cls-culprits-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.NETWORK_DEPENDENCY_TREE]: {
+    component: TimelineInsights.NetworkDependencyTree.NetworkDependencyTree,
+    accessibleLabel: UIStringsNotTranslate2.revealNetworkDependencyTree,
+    title: UIStringsNotTranslate2.networkDependencyTree,
+    jslog: "network-dependency-tree-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.THIRD_PARTIES]: {
+    component: TimelineInsights.ThirdParties.ThirdParties,
+    accessibleLabel: UIStringsNotTranslate2.revealThirdParties,
+    title: UIStringsNotTranslate2.thirdParties,
+    jslog: "third-parties-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.FORCED_REFLOW]: {
+    component: TimelineInsights.ForcedReflow.ForcedReflow,
+    accessibleLabel: UIStringsNotTranslate2.revealForcedReflow,
+    title: UIStringsNotTranslate2.forcedReflow,
+    jslog: "forced-reflow-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.CACHE]: {
+    component: TimelineInsights.Cache.Cache,
+    accessibleLabel: UIStringsNotTranslate2.revealCache,
+    title: UIStringsNotTranslate2.cache,
+    jslog: "cache-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.INP_BREAKDOWN]: {
+    component: TimelineInsights.INPBreakdown.INPBreakdown,
+    accessibleLabel: UIStringsNotTranslate2.revealInpBreakdown,
+    title: UIStringsNotTranslate2.inpBreakdown,
+    jslog: "inp-breakdown-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.DOCUMENT_LATENCY]: {
+    component: TimelineInsights.DocumentLatency.DocumentLatency,
+    accessibleLabel: UIStringsNotTranslate2.revealDocumentLatency,
+    title: UIStringsNotTranslate2.documentLatency,
+    jslog: "document-latency-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.DOM_SIZE]: {
+    component: TimelineInsights.DOMSize.DOMSize,
+    accessibleLabel: UIStringsNotTranslate2.revealDomSize,
+    title: UIStringsNotTranslate2.domSize,
+    jslog: "dom-size-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.DUPLICATE_JAVASCRIPT]: {
+    component: TimelineInsights.DuplicatedJavaScript.DuplicatedJavaScript,
+    accessibleLabel: UIStringsNotTranslate2.revealDuplicateJavaScript,
+    title: UIStringsNotTranslate2.duplicateJavaScript,
+    jslog: "duplicate-javascript-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.IMAGE_DELIVERY]: {
+    component: TimelineInsights.ImageDelivery.ImageDelivery,
+    accessibleLabel: UIStringsNotTranslate2.revealImageDelivery,
+    title: UIStringsNotTranslate2.imageDelivery,
+    jslog: "image-delivery-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.FONT_DISPLAY]: {
+    component: TimelineInsights.FontDisplay.FontDisplay,
+    accessibleLabel: UIStringsNotTranslate2.revealFontDisplay,
+    title: UIStringsNotTranslate2.fontDisplay,
+    jslog: "font-display-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.SLOW_CSS_SELECTOR]: {
+    component: TimelineInsights.SlowCSSSelector.SlowCSSSelector,
+    accessibleLabel: UIStringsNotTranslate2.revealSlowCssSelector,
+    title: UIStringsNotTranslate2.slowCssSelector,
+    jslog: "slow-css-selector-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.LEGACY_JAVASCRIPT]: {
+    component: TimelineInsights.LegacyJavaScript.LegacyJavaScript,
+    accessibleLabel: UIStringsNotTranslate2.revealLegacyJavaScript,
+    title: UIStringsNotTranslate2.legacyJavaScript,
+    jslog: "legacy-javascript-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.VIEWPORT]: {
+    component: TimelineInsights.Viewport.Viewport,
+    accessibleLabel: UIStringsNotTranslate2.revealViewport,
+    title: UIStringsNotTranslate2.viewport,
+    jslog: "viewport-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.MODERN_HTTP]: {
+    component: TimelineInsights.ModernHTTP.ModernHTTP,
+    accessibleLabel: UIStringsNotTranslate2.revealModernHttp,
+    title: UIStringsNotTranslate2.modernHttp,
+    jslog: "modern-http-widget"
+  },
+  [Trace2.Insights.Types.InsightKeys.CHARACTER_SET]: {
+    component: TimelineInsights.CharacterSet.CharacterSet,
+    accessibleLabel: UIStringsNotTranslate2.revealCharacterSet,
+    title: UIStringsNotTranslate2.characterSet,
+    jslog: "character-set-widget"
+  }
+};
+function renderInsightWidget(component, insight, jslog, accessibleLabel, title, bounds) {
+  const renderedWidget = html6`<devtools-widget
+    class=${jslog}
+    ${widget2(component, {
+    model: insight,
+    minimal: true,
+    bounds: bounds ?? null
+  })}
+  ></devtools-widget>`;
+  return {
+    renderedWidget,
+    revealable: new TimelineUtils.Helpers.RevealableInsight(insight),
+    accessibleRevealLabel: lockedString3(accessibleLabel),
+    title: lockedString3(title),
+    jslogContext: jslog
+  };
+}
+async function makePerfInsightWidget(widgetData) {
+  const insightKey = widgetData.data.insight;
+  const insight = widgetData.data.insightData;
+  const meta = INSIGHT_METADATA[insightKey];
+  if (!meta) {
+    return null;
+  }
+  let bounds;
+  if (insightKey === Trace2.Insights.Types.InsightKeys.CLS_CULPRITS) {
+    const traceBounds = TraceBounds.TraceBounds.BoundsManager.instance().state()?.micro.entireTraceBounds;
+    if (!traceBounds) {
+      return null;
+    }
+    bounds = traceBounds;
+  }
+  return renderInsightWidget(meta.component, insight, meta.jslog, meta.accessibleLabel, meta.title, bounds);
+}
+async function makeBottomUpTimelineTreeWidget(widgetData) {
+  const bottomUpRootNode = AiAssistanceModel6.AIQueries.AIQueries.mainThreadActivityBottomUp(widgetData.data.bounds, widgetData.data.parsedTrace);
+  if (!bottomUpRootNode) {
+    return null;
+  }
+  const events = bottomUpRootNode.events;
+  const startTime = Trace2.Helpers.Timing.microToMilli(widgetData.data.bounds.min);
+  const endTime = Trace2.Helpers.Timing.microToMilli(widgetData.data.bounds.max);
+  const renderedWidget = html6`<devtools-widget
+      class="bottom-up-timeline-tree-widget"
+      ${widget2(Timeline.TimelineTreeView.BottomUpTimelineTreeView, {
+    selectedEvents: events,
+    parsedTrace: widgetData.data.parsedTrace,
+    startTime,
+    endTime,
+    compactMode: true,
+    maxLinkLength: 15,
+    maxRows: 10
+  })}></devtools-widget>`;
+  return {
+    renderedWidget,
+    revealable: new TimelineUtils.Helpers.RevealableBottomUpProfile(widgetData.data.bounds),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealBottomUpTree),
+    title: lockedString3(UIStringsNotTranslate2.bottomUpTree),
+    jslogContext: "bottom-up"
+  };
+}
+function renderWidgetResponse(response) {
+  if (response === null) {
+    return Lit6.nothing;
+  }
+  function onReveal() {
+    if (response === null) {
+      return;
+    }
+    Common3.Revealer.reveal(response?.revealable).catch((error) => {
+      if (!error.message) {
+        return;
+      }
+      Snackbars2.Snackbar.Snackbar.show({ message: error.message });
+    });
+  }
+  const classes = Lit6.Directives.classMap({
+    "widget-and-revealer-container": true,
+    "revealer-only": response.renderedWidget === null
+  });
+  const revealButton = html6`
+    <devtools-button class="widget-reveal-button"
+      .variant=${"text"}
+      .accessibleLabel=${response.accessibleRevealLabel}
+      .jslogContext=${"reveal"}
+      @click=${onReveal}
+    >
+      ${response.customRevealTitle ?? lockedString3(UIStringsNotTranslate2.reveal)}
+      <devtools-icon name='tab-move'></devtools-icon>
+    </devtools-button>
+  `;
+  return html6`
+    <div class=${classes} jslog=${ifDefined(response.jslogContext ? VisualLogging3.section(response.jslogContext) : void 0)}>
+      ${response.title ? html6`
+        <div class="widget-header">
+          <h4 class="widget-name">${response.title}</h4>
+          <div class="widget-reveal-container">
+            ${revealButton}
+          </div>
+        </div>
+      ` : Lit6.nothing}
+      ${response.renderedWidget ? html6`
+        <div class="widget-content-container">
+          ${response.renderedWidget}
+        </div>` : Lit6.nothing}
+      ${!response.title ? html6`
+        <div class="widget-reveal-container">
+          ${revealButton}
+        </div>
+      ` : Lit6.nothing}
+    </div>
+    `;
+}
+async function makePerformanceTraceWidget(widgetData) {
+  const customRevealTitle = lockedString3(UIStringsNotTranslate2.revealTrace);
+  return {
+    renderedWidget: null,
+    title: null,
+    revealable: new Timeline.TimelinePanel.ParsedTraceRevealable(widgetData.data.parsedTrace),
+    customRevealTitle,
+    accessibleRevealLabel: customRevealTitle,
+    jslogContext: "performance-trace"
+  };
+}
+async function makeSourceFileWidget(widgetData) {
+  const file = widgetData.data.uiSourceCode;
+  const customRevealTitle = i18n5.i18n.lockedString(`Show ${file.name()}`);
+  return {
+    renderedWidget: null,
+    title: null,
+    revealable: file,
+    customRevealTitle,
+    accessibleRevealLabel: customRevealTitle,
+    jslogContext: "source-file-widget"
+  };
+}
+async function makeSourceCodeWidget(widgetData) {
+  const url = widgetData.data.url;
+  const filename = url.split("/").pop() || url;
+  const line = widgetData.data.line;
+  const column = widgetData.data.column;
+  const header = line !== void 0 && column !== void 0 ? `${filename}:${line}:${column}` : filename;
+  const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(url);
+  const lastDotIndex = filename.lastIndexOf(".");
+  const fileExtension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1) : "";
+  let code = widgetData.data.code;
+  if (TextUtils.TextUtils.isMinified(code)) {
+    const canonicalMimeType = uiSourceCode?.contentType().canonicalMimeType() || "text/javascript";
+    const formatted = await Formatter.ScriptFormatter.formatScriptContent(Common3.Settings.Settings.instance(), canonicalMimeType, code, "  ");
+    code = formatted.formattedContent;
+  }
+  const renderedWidget = html6`
+    <devtools-code-block
+      class="source-code-widget"
+      .displayLimit=${20}
+      .code=${code}
+      .codeLang=${fileExtension}
+      .displayToolbar=${false}
+      .displayNotice=${false}
+    ></devtools-code-block>
+  `;
+  return {
+    renderedWidget,
+    title: lockedString3(header),
+    revealable: uiSourceCode,
+    accessibleRevealLabel: i18n5.i18n.lockedString(`Show ${filename} in Sources`),
+    jslogContext: "source-code-widget"
+  };
+}
+function renderFileRevealButton(file, collapsed) {
+  const onReveal = () => {
+    void Common3.Revealer.reveal(file);
+  };
+  const accessibleLabel = i18n5.i18n.lockedString(`Show ${file.fullDisplayName()}`);
+  const className = `widget-reveal-button ${collapsed ? "collapsed-file" : "visible-file"}`;
+  return html6`
+    <devtools-button class=${className}
+      .variant=${"text"}
+      .accessibleLabel=${accessibleLabel}
+      .jslogContext=${"reveal"}
+      @click=${onReveal}>
+      ${file.fullDisplayName()}
+      <devtools-icon name='tab-move'></devtools-icon>
+    </devtools-button>
+  `;
+}
+async function makeSourceFilesListWidget(widgetData) {
+  const files = widgetData.data.uiSourceCodes;
+  if (files.length === 0) {
+    return null;
+  }
+  const renderedWidget = html6`
+    <div class="source-files-widget">
+      ${files.slice(0, 10).map((file) => renderFileRevealButton(
+    file,
+    /* collapsed */
+    false
+  ))}
+      ${files.length > 10 ? html6`
+        <details class="source-files-details">
+          <summary class="show-more-summary">${i18n5.i18n.lockedString(`Show all ${files.length} files`)}</summary>
+          ${files.slice(10).map((file) => renderFileRevealButton(
+    file,
+    /* collapsed */
+    true
+  ))}
+        </details> ` : Lit6.nothing}
+    </div>`;
+  const title = lockedString3(UIStringsNotTranslate2.inspectedFileNames);
+  return {
+    renderedWidget,
+    title,
+    revealable: files[0],
+    accessibleRevealLabel: i18n5.i18n.lockedString("Reveal first file in Sources panel"),
+    jslogContext: "source-files-list-widget"
+  };
+}
+var expandedNetworkRequestsWidgets = /* @__PURE__ */ new WeakSet();
+async function makeNetworkRequestsListWidget(widgetData) {
+  const requests = widgetData.data.requests;
+  if (requests.length === 0) {
+    return null;
+  }
+  const isExpanded = expandedNetworkRequestsWidgets.has(widgetData);
+  if (isExpanded) {
+    expandedNetworkRequestsWidgets.delete(widgetData);
+  }
+  const displayedRequests = isExpanded ? requests : requests.slice(0, 15);
+  const renderedWidget = html6`
+    <div class="network-requests-widget">
+      <devtools-data-grid striped inline>
+        <table>
+          <tr>
+            <th id="name" weight="4">${i18n5.i18n.lockedString("Name")}</th>
+            <th id="status" weight="1">${i18n5.i18n.lockedString("Status")}</th>
+            <th id="size" weight="1">${i18n5.i18n.lockedString("Size")}</th>
+            <th id="time" weight="1">${i18n5.i18n.lockedString("Time")}</th>
+          </tr>
+          ${displayedRequests.map((request) => html6`
+            <tr>
+              <td>${request.name()}</td>
+              <td>${request.statusCode}</td>
+              <td>${i18n5.ByteUtilities.formatBytesToKb(request.transferSize)}</td>
+              <td>${i18n5.TimeUtilities.secondsToString(request.duration)}</td>
+            </tr>
+          `)}
+        </table>
+      </devtools-data-grid>
+      ${!isExpanded && requests.length > 15 ? html6`
+        <div class="show-all-container">
+          <button class="show-all-widget-requests-button text-button"
+            jslog=${VisualLogging3.action("show-all-widget-requests-button").track({ click: true })}
+            @click=${(e) => {
+    expandedNetworkRequestsWidgets.add(widgetData);
+    const widgetEl = e.target.closest(".widget");
+    if (widgetEl) {
+      const widget5 = UI3.Widget.Widget.get(widgetEl);
+      if (widget5 && widget5.performUpdate) {
+        void widget5.performUpdate();
+      }
+    }
+  }}>
+            ${i18n5.i18n.lockedString(`Show all ${requests.length} network requests`)}
+          </button>
+        </div>
+      ` : Lit6.nothing}
+    </div>
+  `;
+  return {
+    renderedWidget,
+    title: lockedString3(UIStringsNotTranslate2.networkRequests),
+    revealable: requests[0],
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealFirstNetworkRequest),
+    jslogContext: "network-requests-list-widget"
+  };
+}
+function renderNetworkRequestPreview(networkRequest) {
+  const filename = networkRequest.url.split("/").pop() || networkRequest.url;
+  const size = i18n5.ByteUtilities.bytesToString(networkRequest.size);
+  const resourceType = Common3.ResourceType.resourceTypes[networkRequest.resourceType];
+  const { iconName, color } = PanelUtils3.iconDataForResourceType(resourceType);
+  const imageUrl = networkRequest.imageContent?.asImagePreviewUrl();
+  return html6`
+    <div class="network-request-preview">
+      <div class="network-request-header">
+        <div class="network-request-icon">
+          ${resourceType.isImage() && imageUrl ? (
+    // only try to render the image if we have a preview URL, else fallback to a coloured square.
+    html6`<img src=${imageUrl} alt=${filename} />`
+  ) : html6`<devtools-icon name=${iconName} style=${Lit6.Directives.styleMap({ color: color ?? "" })}></devtools-icon>`}
+        </div>
+        <div class="network-request-details">
+          <div class="network-request-name" title=${networkRequest.url}>${filename}</div>
+          <div class="network-request-size">${size}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+async function makeDomTreeWidget(widgetData) {
+  const root = widgetData.data.root;
+  if (!(root instanceof SDK4.DOMModel.DOMNodeSnapshot)) {
+    return null;
+  }
+  const networkRequest = widgetData.data.networkRequest;
+  const renderedWidget = html6`
+    ${networkRequest ? renderNetworkRequestPreview(networkRequest) : Lit6.nothing}
+    <devtools-widget class="dom-tree-widget" ${widget2(Elements.ElementsTreeOutline.DOMTreeWidget, {
+    maxTreeDepth: 2,
+    enableContextMenu: false,
+    showComments: false,
+    showAIButton: false,
+    disableEdits: true,
+    expandRoot: true,
+    rootDOMNode: root,
+    visibleWidth: 400,
+    wrap: true,
+    maxRows: 10
+  })}></devtools-widget>
+  `;
+  return {
+    renderedWidget,
+    revealable: new SDK4.DOMModel.DeferredDOMNode(root.domModel().target(), root.backendNodeId()),
+    accessibleRevealLabel: widgetData.data.accessibleRevealLabel,
+    title: widgetData.data.title,
+    jslogContext: "dom-snapshot"
+  };
+}
+function getWidgetSignature(widget5) {
+  switch (widget5.name) {
+    case "COMPUTED_STYLES":
+      return `${widget5.name}:${widget5.data.backendNodeId}`;
+    case "CORE_VITALS":
+      return `${widget5.name}:${widget5.data.insightSetKey}`;
+    case "STYLE_PROPERTIES":
+      return `${widget5.name}:${widget5.data.backendNodeId}:${widget5.data.selector ?? ""}`;
+    case "DOM_TREE":
+      return `${widget5.name}:${widget5.data.root.backendNodeId()}`;
+    case "PERFORMANCE_TRACE":
+      return `${widget5.name}`;
+    case "PERF_INSIGHT":
+      return `${widget5.name}:${widget5.data.insight}:${widget5.data.insightData.insightKey}:${widget5.data.insightData.navigation?.args?.data?.navigationId ?? "no-nav-id"}`;
+    case "TIMELINE_RANGE_SUMMARY":
+      return `${widget5.name}:${widget5.data.track}:${widget5.data.bounds.min}-${widget5.data.bounds.max}`;
+    case "BOTTOM_UP_TREE":
+      return `${widget5.name}:${widget5.data.bounds.min}-${widget5.data.bounds.max}`;
+    case "NETWORK_TRACK":
+      return `${widget5.name}:${widget5.data.bounds.min}-${widget5.data.bounds.max}`;
+    case "SOURCE_FILE":
+      return `${widget5.name}:${widget5.data.uiSourceCode.url()}`;
+    case "SOURCE_FILES_LIST":
+      return `${widget5.name}:${widget5.data.uiSourceCodes.map((f) => f.url()).join(",")}`;
+    case "LIGHTHOUSE_REPORT":
+      return `${widget5.name}:${widget5.data.report.fetchTime}`;
+    case "TIMELINE_EVENT_SUMMARY":
+      return `${widget5.name}:${widget5.data.event.ts}:${widget5.data.event.name}`;
+    case "NETWORK_REQUEST_GENERAL_HEADERS":
+      return `${widget5.name}:${widget5.data.request.requestId()}`;
+    case "SOURCE_CODE":
+      return `${widget5.name}:${widget5.data.url}:${widget5.data.line ?? ""}:${widget5.data.column ?? ""}`;
+    case "NETWORK_REQUESTS_LIST":
+      return `${widget5.name}:${widget5.data.requests.map((r) => r.requestId()).join(",")}`;
+    case "STORAGE_BREAKDOWN":
+      return `${widget5.name}:${widget5.data.totalUsageBytes}:${widget5.data.usageBreakdown.map((e) => `${e.storageType}_${e.bytes}`).join(",")}`;
+    default:
+      Platform3.assertNever(widget5, "Unknown AiAssistanceModel.AiAgent.AiWidget name");
+  }
+}
+function getDeduplicatedWidgetsMessage(message) {
+  const seenWidgets = /* @__PURE__ */ new Set();
+  const filterWidgets = (widgets) => {
+    return widgets.filter((widget5) => {
+      const signature = getWidgetSignature(widget5);
+      if (seenWidgets.has(signature)) {
+        return false;
+      }
+      seenWidgets.add(signature);
+      return true;
+    });
+  };
+  const deduplicatedParts = message.parts.map((part) => {
+    if (part.type === "widget") {
+      return {
+        ...part,
+        widgets: filterWidgets(part.widgets)
+      };
+    }
+    if (part.type === "step" && part.step.widgets) {
+      return {
+        ...part,
+        step: {
+          ...part.step,
+          widgets: filterWidgets(part.step.widgets)
+        }
+      };
+    }
+    return part;
+  });
+  return {
+    ...message,
+    parts: deduplicatedParts
+  };
+}
+async function renderWidgets(widgets, options = {}) {
+  if (!widgets || widgets.length === 0) {
+    return Lit6.nothing;
+  }
+  const ui = await Promise.all(widgets.map(async (widgetData) => {
+    let response = null;
+    switch (widgetData.name) {
+      case "COMPUTED_STYLES":
+        response = await makeComputedStyleWidget(widgetData);
+        break;
+      case "CORE_VITALS":
+        response = await makeCoreWebVitalsWidget(widgetData);
+        break;
+      case "STYLE_PROPERTIES":
+        response = await makeStylePropertiesWidget(widgetData);
+        break;
+      case "DOM_TREE":
+        response = await makeDomTreeWidget(widgetData);
+        break;
+      case "PERFORMANCE_TRACE":
+        response = await makePerformanceTraceWidget(widgetData);
+        break;
+      case "PERF_INSIGHT":
+        response = await makePerfInsightWidget(widgetData);
+        break;
+      case "TIMELINE_RANGE_SUMMARY":
+        response = await makeTimelineRangeSummaryWidget(widgetData);
+        break;
+      case "BOTTOM_UP_TREE":
+        response = await makeBottomUpTimelineTreeWidget(widgetData);
+        break;
+      case "NETWORK_TRACK":
+        response = await makeNetworkTrackWidget(widgetData);
+        break;
+      case "SOURCE_FILE":
+        response = await makeSourceFileWidget(widgetData);
+        break;
+      case "SOURCE_FILES_LIST":
+        response = await makeSourceFilesListWidget(widgetData);
+        break;
+      case "NETWORK_REQUESTS_LIST":
+        response = await makeNetworkRequestsListWidget(widgetData);
+        break;
+      case "LIGHTHOUSE_REPORT":
+        response = await makeLighthouseReportWidget(widgetData);
+        break;
+      case "TIMELINE_EVENT_SUMMARY":
+        response = await makeTimelineEventSummaryWidget(widgetData);
+        break;
+      case "NETWORK_REQUEST_GENERAL_HEADERS":
+        response = await makeNetworkRequestGeneralHeadersWidget(widgetData);
+        break;
+      case "SOURCE_CODE":
+        response = await makeSourceCodeWidget(widgetData);
+        break;
+      case "STORAGE_BREAKDOWN":
+        response = await makeStorageBreakdownWidget(widgetData);
+        break;
+      default:
+        Platform3.assertNever(widgetData, "Unknown AiAssistanceModel.AiAgent.AiWidget name");
+    }
+    return renderWidgetResponse(response);
+  }));
+  const renderedItems = ui.filter((item) => item !== Lit6.nothing);
+  if (renderedItems.length === 0) {
+    return Lit6.nothing;
+  }
+  if (options.wrapperClass) {
+    return html6`<div class=${options.wrapperClass}>${renderedItems}</div>`;
+  }
+  return html6`${renderedItems}`;
+}
+function renderSideEffectConfirmationUi(step) {
+  if (step.state.type !== "needs_approval") {
+    return Lit6.nothing;
+  }
+  const dialog3 = step.state.sideEffectDialog;
+  return html6`<div
+    class="side-effect-confirmation"
+    jslog=${VisualLogging3.section("side-effect-confirmation")}
+  >
+    ${dialog3.description ? html6`<p>${dialog3.description}</p>` : Lit6.nothing}
+    <div class="side-effect-buttons-container">
+      <devtools-button
+        .data=${{
+    variant: "outlined",
+    jslogContext: "decline-execute-code"
+  }}
+        @click=${() => dialog3.onAnswer(false)}
+      >${lockedString3(UIStringsNotTranslate2.declineActionRequestApproval)}</devtools-button>
+      <devtools-button
+        .data=${{
+    variant: "primary",
+    jslogContext: "accept-execute-code",
+    iconName: "play"
+  }}
+        @click=${() => dialog3.onAnswer(true)}
+      >${lockedString3(UIStringsNotTranslate2.confirmActionRequestApproval)}</devtools-button>
+    </div>
+  </div>`;
+}
+function renderError(message) {
+  if (message.error) {
+    let errorMessage;
+    switch (message.error) {
+      case "unknown":
+      case "block":
+        errorMessage = UIStringsNotTranslate2.systemError;
+        break;
+      case "quota":
+        errorMessage = UIStringsNotTranslate2.quotaError;
+        break;
+      case "max-steps":
+        errorMessage = UIStringsNotTranslate2.maxStepsError;
+        break;
+      case "cross-origin":
+        errorMessage = UIStringsNotTranslate2.crossOriginError;
+        break;
+      case "payload-too-large":
+        errorMessage = UIStringsNotTranslate2.payloadTooLargeError;
+        break;
+      case "abort":
+        return html6`<p class="aborted" jslog=${VisualLogging3.section("aborted")}>${lockedString3(UIStringsNotTranslate2.stoppedResponse)}</p>`;
+    }
+    return html6`<p class="error" jslog=${VisualLogging3.section("error")}>${lockedString3(errorMessage)}</p>`;
+  }
+  return Lit6.nothing;
+}
+function renderImageChatMessage(inlineData) {
+  if (inlineData.data === AiAssistanceModel6.AiConversation.NOT_FOUND_IMAGE_DATA) {
+    return html6`<div class="unavailable-image" title=${UIStringsNotTranslate2.imageUnavailable}>
+      <devtools-icon name='file-image'></devtools-icon>
+    </div>`;
+  }
+  const imageUrl = `data:${inlineData.mimeType};base64,${inlineData.data}`;
+  return html6`<devtools-link
+      class="image-link" title=${UIStringsNotTranslate2.openImageInNewTab}
+      href=${imageUrl}
+    >
+      <img src=${imageUrl} alt=${UIStringsNotTranslate2.imageInputSentToTheModel} />
+    </devtools-link>`;
+}
+function renderActions(input, output) {
+  return html6`
+    <div class="ai-assistance-feedback-row">
+      <div class="action-buttons">
+        ${input.showRateButtons ? html6`
+          <devtools-button
+            .data=${{
+    variant: "icon",
+    size: "SMALL",
+    iconName: "thumb-up",
+    toggledIconName: "thumb-up-filled",
+    toggled: input.currentRating === "POSITIVE",
+    toggleType: "primary-toggle",
+    title: lockedString3(UIStringsNotTranslate2.thumbsUp),
+    jslogContext: "thumbs-up"
+  }}
+            @click=${() => input.onRatingClick(
+    "POSITIVE"
+    /* Host.AidaClient.Rating.POSITIVE */
+  )}
+          ></devtools-button>
+          <devtools-button
+            .data=${{
+    variant: "icon",
+    size: "SMALL",
+    iconName: "thumb-down",
+    toggledIconName: "thumb-down-filled",
+    toggled: input.currentRating === "NEGATIVE",
+    toggleType: "primary-toggle",
+    title: lockedString3(UIStringsNotTranslate2.thumbsDown),
+    jslogContext: "thumbs-down"
+  }}
+            @click=${() => input.onRatingClick(
+    "NEGATIVE"
+    /* Host.AidaClient.Rating.NEGATIVE */
+  )}
+          ></devtools-button>
+        ` : Lit6.nothing}
+        <devtools-button
+          .data=${{
+    variant: "icon",
+    size: "SMALL",
+    title: lockedString3(UIStringsNotTranslate2.report),
+    iconName: "report",
+    jslogContext: "report"
+  }}
+          @click=${input.onReportClick}
+        ></devtools-button>
+        ${input.onExportClick && input.isLastMessage ? html6`
+          <devtools-button
+            class="export-for-agents-button"
+            .jslogContext=${"ai-export-for-agents"}
+            .variant=${"outlined"}
+            .iconName=${"copy"}
+            aria-label=${lockedString3(UIStringsNotTranslate2.exportForAgents)}
+            @click=${input.onExportClick}
+          >${lockedString3(UIStringsNotTranslate2.exportForAgents)}</devtools-button>
+          ${input.suggestions ? html6`<div class="vertical-separator"></div>` : Lit6.nothing}
+        ` : Lit6.nothing}
+      </div>
+      ${input.suggestions ? html6`<div class="suggestions-container">
+        <div class="scroll-button-container left hidden" ${ref3((element) => {
+    output.suggestionsLeftScrollButtonContainer = element;
+  })}>
+          <devtools-button
+            class='scroll-button'
+            .data=${{
+    variant: "icon",
+    size: "SMALL",
+    iconName: "chevron-left",
+    title: lockedString3(UIStringsNotTranslate2.scrollToPrevious),
+    jslogContext: "chevron-left"
+  }}
+            @click=${() => input.scrollSuggestionsScrollContainer("left")}
+          ></devtools-button>
+        </div>
+        <div class="suggestions-scroll-container" @scroll=${input.onSuggestionsScrollOrResize} ${ref3((element) => {
+    output.suggestionsScrollContainer = element;
+  })}>
+          ${input.suggestions.map((suggestion) => html6`<devtools-button
+            class='suggestion'
+            .data=${{
+    variant: "outlined",
+    title: suggestion,
+    jslogContext: "suggestion"
+  }}
+            @click=${() => input.onSuggestionClick(suggestion)}
+          >${suggestion}</devtools-button>`)}
+        </div>
+        <div class="scroll-button-container right hidden" ${ref3((element) => {
+    output.suggestionsRightScrollButtonContainer = element;
+  })}>
+          <devtools-button
+            class='scroll-button'
+            .data=${{
+    variant: "icon",
+    size: "SMALL",
+    iconName: "chevron-right",
+    title: lockedString3(UIStringsNotTranslate2.scrollToNext),
+    jslogContext: "chevron-right"
+  }}
+            @click=${() => input.scrollSuggestionsScrollContainer("right")}
+          ></devtools-button>
+        </div>
+      </div>` : Lit6.nothing}
+    </div>
+    ${input.isShowingFeedbackForm ? html6`
+      <form class="feedback-form" @submit=${input.onSubmit}>
+        <div class="feedback-header">
+          <h4 class="feedback-title">${lockedString3(UIStringsNotTranslate2.whyThisRating)}</h4>
+          <devtools-button
+            aria-label=${lockedString3(UIStringsNotTranslate2.close)}
+            @click=${input.onClose}
+            .data=${{
+    variant: "icon",
+    iconName: "cross",
+    size: "SMALL",
+    title: lockedString3(UIStringsNotTranslate2.close),
+    jslogContext: "close"
+  }}
+          ></devtools-button>
+        </div>
+        <input
+          type="text"
+          class="devtools-text-input feedback-input"
+          @input=${(event) => input.onInputChange(event.target.value)}
+          placeholder=${lockedString3(UIStringsNotTranslate2.provideFeedbackPlaceholder)}
+          jslog=${VisualLogging3.textField("feedback").track({ keydown: "Enter" })}
+        >
+        <span class="feedback-disclaimer">${lockedString3(UIStringsNotTranslate2.disclaimer)}</span>
+        <div>
+          <devtools-button
+          aria-label=${lockedString3(UIStringsNotTranslate2.submit)}
+          .data=${{
+    type: "submit",
+    disabled: input.isSubmitButtonDisabled,
+    variant: "outlined",
+    size: "SMALL",
+    title: lockedString3(UIStringsNotTranslate2.submit),
+    jslogContext: "send"
+  }}
+          >${lockedString3(UIStringsNotTranslate2.submit)}</devtools-button>
+        </div>
+      </div>
+    </form>
+    ` : Lit6.nothing}
+  `;
+}
+var ChatMessage = class extends UI3.Widget.Widget {
+  message = { entity: "user", text: "", id: "" };
+  isLoading = false;
+  isReadOnly = false;
+  prompt = "";
+  canShowFeedbackForm = false;
+  isLastMessage = false;
+  isFirstMessage = false;
+  markdownRenderer;
+  onSuggestionClick = () => {
+  };
+  onFeedbackSubmit = () => {
+  };
+  onCopyResponseClick = () => {
+  };
+  onExportClick = () => {
+  };
+  walkthrough = {
+    onOpen: () => {
+    },
+    onToggle: () => {
+    },
+    isInlined: false,
+    isExpanded: false,
+    activeSidebarMessage: null,
+    inlineExpandedMessages: []
+  };
+  #suggestionsResizeObserver = new ResizeObserver(() => this.#handleSuggestionsScrollOrResize());
+  #suggestionsEvaluateLayoutThrottler = new Common3.Throttler.Throttler(100);
+  #feedbackValue = "";
+  #currentRating;
+  #isShowingFeedbackForm = false;
+  #isSubmitButtonDisabled = true;
+  #view;
+  #viewOutput = {};
+  #isObservingSuggestions = false;
+  constructor(element, view) {
+    super(element);
+    this.#view = view ?? DEFAULT_VIEW3;
+  }
+  wasShown() {
+    super.wasShown();
+    void this.performUpdate();
+    this.#evaluateSuggestionsLayout();
+  }
+  performUpdate() {
+    const message = this.message.entity === "model" ? getDeduplicatedWidgetsMessage(this.message) : this.message;
+    this.#view({
+      message,
+      isLoading: this.isLoading,
+      isReadOnly: this.isReadOnly,
+      canShowFeedbackForm: this.canShowFeedbackForm,
+      markdownRenderer: this.markdownRenderer,
+      isLastMessage: this.isLastMessage,
+      isFirstMessage: this.isFirstMessage,
+      prompt: this.prompt,
+      onSuggestionClick: this.onSuggestionClick,
+      onRatingClick: this.#handleRateClick.bind(this),
+      onReportClick: () => UIHelpers.openInNewTab(REPORT_URL),
+      onCopyResponseClick: () => {
+        if (this.message.entity === "model") {
+          this.onCopyResponseClick(this.message);
+        }
+      },
+      onExportClick: this.onExportClick,
+      scrollSuggestionsScrollContainer: this.#scrollSuggestionsScrollContainer.bind(this),
+      onSuggestionsScrollOrResize: this.#handleSuggestionsScrollOrResize.bind(this),
+      onSubmit: this.#handleSubmit.bind(this),
+      onClose: this.#handleClose.bind(this),
+      onInputChange: this.#handleInputChange.bind(this),
+      isSubmitButtonDisabled: this.#isSubmitButtonDisabled,
+      // Props for actions logic
+      showActions: !(this.isLastMessage && this.isLoading),
+      showRateButtons: this.message.entity === "model" && !!this.message.rpcId,
+      suggestions: this.isLastMessage && this.message.entity === "model" && !this.isReadOnly && this.message.parts.at(-1)?.type === "answer" ? this.message.parts.at(-1).suggestions : void 0,
+      currentRating: this.#currentRating,
+      isShowingFeedbackForm: this.#isShowingFeedbackForm,
+      onFeedbackSubmit: this.onFeedbackSubmit,
+      walkthrough: this.walkthrough
+    }, this.#viewOutput, this.contentElement);
+    if (this.#viewOutput.suggestionsScrollContainer && !this.#isObservingSuggestions) {
+      this.#suggestionsResizeObserver.observe(this.#viewOutput.suggestionsScrollContainer);
+      this.#isObservingSuggestions = true;
+    }
+  }
+  #handleInputChange(value) {
+    this.#feedbackValue = value;
+    const disableSubmit = !value;
+    if (disableSubmit !== this.#isSubmitButtonDisabled) {
+      this.#isSubmitButtonDisabled = disableSubmit;
+      void this.performUpdate();
+    }
+  }
+  #evaluateSuggestionsLayout = () => {
+    const suggestionsScrollContainer = this.#viewOutput.suggestionsScrollContainer;
+    const leftScrollButtonContainer = this.#viewOutput.suggestionsLeftScrollButtonContainer;
+    const rightScrollButtonContainer = this.#viewOutput.suggestionsRightScrollButtonContainer;
+    if (!suggestionsScrollContainer || !leftScrollButtonContainer || !rightScrollButtonContainer) {
+      return;
+    }
+    const shouldShowLeftButton = suggestionsScrollContainer.scrollLeft > SCROLL_ROUNDING_OFFSET;
+    const shouldShowRightButton = suggestionsScrollContainer.scrollLeft + suggestionsScrollContainer.offsetWidth + SCROLL_ROUNDING_OFFSET < suggestionsScrollContainer.scrollWidth;
+    leftScrollButtonContainer.classList.toggle("hidden", !shouldShowLeftButton);
+    rightScrollButtonContainer.classList.toggle("hidden", !shouldShowRightButton);
+  };
+  willHide() {
+    super.willHide();
+    this.#suggestionsResizeObserver.disconnect();
+    this.#isObservingSuggestions = false;
+  }
+  #handleSuggestionsScrollOrResize() {
+    void this.#suggestionsEvaluateLayoutThrottler.schedule(() => {
+      this.#evaluateSuggestionsLayout();
+      return Promise.resolve();
+    });
+  }
+  #scrollSuggestionsScrollContainer(direction) {
+    const suggestionsScrollContainer = this.#viewOutput.suggestionsScrollContainer;
+    if (!suggestionsScrollContainer) {
+      return;
+    }
+    suggestionsScrollContainer.scroll({
+      top: 0,
+      left: direction === "left" ? suggestionsScrollContainer.scrollLeft - suggestionsScrollContainer.clientWidth : suggestionsScrollContainer.scrollLeft + suggestionsScrollContainer.clientWidth,
+      behavior: "smooth"
+    });
+  }
+  #handleRateClick(rating) {
+    if (this.#currentRating === rating) {
+      this.#currentRating = void 0;
+      this.#isShowingFeedbackForm = false;
+      this.#isSubmitButtonDisabled = true;
+      if (this.message.entity === "model" && this.message.rpcId) {
+        this.onFeedbackSubmit(
+          this.message.rpcId,
+          "SENTIMENT_UNSPECIFIED"
+          /* Host.AidaClient.Rating.SENTIMENT_UNSPECIFIED */
+        );
+      }
+      void this.performUpdate();
+      return;
+    }
+    this.#currentRating = rating;
+    this.#isShowingFeedbackForm = this.canShowFeedbackForm;
+    if (this.message.entity === "model" && this.message.rpcId) {
+      this.onFeedbackSubmit(this.message.rpcId, rating);
+    }
+    void this.performUpdate();
+  }
+  #handleClose() {
+    this.#isShowingFeedbackForm = false;
+    this.#isSubmitButtonDisabled = true;
+    void this.performUpdate();
+  }
+  #handleSubmit(ev) {
+    ev.preventDefault();
+    const input = this.#feedbackValue;
+    if (!this.#currentRating || !input) {
+      return;
+    }
+    if (this.message.entity === "model" && this.message.rpcId) {
+      this.onFeedbackSubmit(this.message.rpcId, this.#currentRating, input);
+    }
+    this.#isShowingFeedbackForm = false;
+    this.#isSubmitButtonDisabled = true;
+    void this.performUpdate();
+  }
+};
+async function makeTimelineRangeSummaryWidget(widgetData) {
+  const { bounds, parsedTrace, track } = widgetData.data;
+  let events = [];
+  if (track === "main") {
+    let navigationId;
+    for (const nav of parsedTrace.data.Meta.mainFrameNavigations) {
+      if (nav.ts <= bounds.min) {
+        navigationId = nav.args.data?.navigationId;
+      } else {
+        break;
+      }
+    }
+    const mainThread = AiAssistanceModel6.AIQueries.AIQueries.findMainThread(navigationId, parsedTrace);
+    if (mainThread) {
+      events = mainThread.entries;
+      AiAssistanceModel6.Debug.debugLog(`AiAssistanceModel.AiAgent.TimelineRangeSummaryAiWidget found main thread. PID:`, mainThread.pid, "TID:", mainThread.tid, "Number of entries:", mainThread.entries.length);
+    }
+  }
+  if (!events) {
+    AiAssistanceModel6.Debug.debugLog(`Warning: could not find events for AiAssistanceModel.AiAgent.TimelineRangeSummaryAiWidget`, widgetData);
+    return null;
+  }
+  const thirdPartyTree = new Timeline.ThirdPartyTreeView.ThirdPartyTreeViewWidget();
+  const mapper = Trace2.EntityMapper.EntityMapper.getOrCreate(parsedTrace);
+  thirdPartyTree.model = { selectedEvents: events, parsedTrace, entityMapper: mapper };
+  thirdPartyTree.activeSelection = Timeline.TimelineSelection.selectionFromRangeMicroSeconds(bounds.min, bounds.max);
+  thirdPartyTree.refreshTree(true);
+  const template = html6`
+    <devtools-widget
+      ${widget2(TimelineComponents.TimelineRangeSummaryView.TimelineRangeSummaryView, {
+    data: {
+      parsedTrace,
+      events,
+      isInAIWidget: true,
+      startTime: Trace2.Helpers.Timing.microToMilli(bounds.min),
+      endTime: Trace2.Helpers.Timing.microToMilli(bounds.max),
+      thirdPartyTreeTemplate: html6`${widget2(Timeline.ThirdPartyTreeView.ThirdPartyTreeViewWidget, {
+        maxRows: 10,
+        isInAIWidget: true,
+        model: {
+          selectedEvents: thirdPartyTree.selectedEvents ?? null,
+          parsedTrace,
+          entityMapper: thirdPartyTree.entityMapper()
+        },
+        activeSelection: { bounds },
+        onBottomUpButtonClicked: (node) => {
+          void Common3.Revealer.reveal(new TimelineUtils.Helpers.RevealableBottomUpProfile(bounds, node ?? void 0));
+        }
+      })}`
+    }
+  })}
+    ></devtools-widget>`;
+  return {
+    renderedWidget: template,
+    revealable: new TimelineUtils.Helpers.RevealableTimeRange(bounds),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealPerformanceSummary),
+    title: lockedString3(UIStringsNotTranslate2.performanceSummary),
+    jslogContext: "timeline-range-summary"
+  };
+}
+async function makeNetworkTrackWidget(widgetData) {
+  const { parsedTrace, bounds } = widgetData.data;
+  const dataProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
+  const template = html6`
+    <devtools-performance-agent-network-track
+      .data=${{
+    parsedTrace,
+    bounds,
+    dataProvider
+  }}
+    ></devtools-performance-agent-network-track>`;
+  return {
+    renderedWidget: template,
+    revealable: new TimelineUtils.Helpers.RevealableTimeRange(bounds),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealNetworkActivity),
+    title: lockedString3(UIStringsNotTranslate2.networkActivitySummary),
+    jslogContext: "network-track-widget"
+  };
+}
+async function makeLighthouseReportWidget(widgetData) {
+  let reportEl = null;
+  try {
+    reportEl = Lighthouse.LighthouseReportRenderer.LighthouseReportRenderer.renderLighthouseScores(widgetData.data.report);
+  } catch {
+    reportEl = null;
+  }
+  const snapshotReport = widgetData.data.snapshotReport;
+  const revealLighthouseLabel = lockedString3(UIStringsNotTranslate2.revealLighthouse);
+  const title = reportEl ? lockedString3(UIStringsNotTranslate2.lighthouseReport) : null;
+  const customRevealTitle = reportEl ? void 0 : revealLighthouseLabel;
+  return {
+    renderedWidget: reportEl ? html6`<div class="lighthouse-report-widget">${reportEl}</div>` : null,
+    revealable: new Lighthouse.LighthousePanel.ActiveLighthouseReport(widgetData.data.report),
+    accessibleRevealLabel: revealLighthouseLabel,
+    customRevealTitle,
+    title,
+    jslogContext: snapshotReport ? "lighthouse-snapshot-report-widget" : "lighthouse-report-widget"
+  };
+}
+async function makeTimelineEventSummaryWidget(widgetData) {
+  const renderedWidget = html6`<devtools-widget class="timeline-event-summary-widget" ${widget2(() => {
+    return Timeline.TimelineDetailsView.TimelineDetailsPane.makeEventWidget(widgetData.data.event, widgetData.data.parsedTrace);
+  })}></devtools-widget>`;
+  return {
+    renderedWidget,
+    revealable: new SDK4.TraceObject.RevealableEvent(widgetData.data.event),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealTimelineEventSummary),
+    title: lockedString3(UIStringsNotTranslate2.timelineEventSummary),
+    jslogContext: "timeline-event-summary-widget"
+  };
+}
+async function makeNetworkRequestGeneralHeadersWidget(widgetData) {
+  const renderedWidget = html6`<devtools-widget class="network-request-general-headers-widget" ${widget2(() => {
+    return Network.RequestHeadersView.RequestHeadersView.createGeneralHeadersView(widgetData.data.request);
+  })}></devtools-widget>`;
+  return {
+    renderedWidget,
+    revealable: NetworkForward.UIRequestLocation.UIRequestLocation.tab(
+      widgetData.data.request,
+      "headers-component"
+      /* NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT */
+    ),
+    accessibleRevealLabel: lockedString3(UIStringsNotTranslate2.revealNetworkRequest),
+    title: lockedString3(UIStringsNotTranslate2.networkRequest),
+    jslogContext: "network-request-general-headers-widget"
+  };
+}
+
+// gen/front_end/panels/ai_assistance/components/chatView.css.js
+var chatView_css_default = `/*
+ * Copyright 2024 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:host {
+  width: 100%;
+  height: 100%;
+  user-select: text;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--sys-color-cdt-base-container);
+}
+
+.chat-ui {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  container-type: size;
+  container-name: --chat-ui-container;
+}
+
+.info-tooltip-container {
+  max-width: var(--sys-size-28);
+  padding: var(--sys-size-4) var(--sys-size-5);
+}
+
+.tooltip-link {
+  display: block;
+  margin-top: var(--sys-size-4);
+  color: var(--sys-color-primary);
+  padding-left: 0;
+}
+
+.chat-cancel-context-button {
+  padding-bottom: 3px;
+  padding-right: var(--sys-size-3);
+}
+
+
+.messages-container {
+  flex-grow: 1;
+  width: 100%;
+  max-width: var(--sys-size-36);
+
+  /* Prevents the container from jumping when the scrollbar is shown */
+  /* 688px is the max width of the input form + left and right paddings: var(--sys-size-36) + 2 * var(--sys-size-5)  */
+  @container (width > 688px) {
+    --half-scrollbar-width: calc((100cqw - 100%) / 2);
+
+    margin-left: var(--half-scrollbar-width);
+    margin-right: calc(-1 * var(--half-scrollbar-width));
+  }
+}
+
+.link {
+  color: var(--text-link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+button.link {
+  border: none;
+  background: none;
+  font: inherit;
+
+  &:focus-visible {
+    outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+    outline-offset: 0;
+    border-radius: var(--sys-shape-corner-extra-small);
+  }
+}
+
+.select-an-element-text {
+  margin-left: var(--sys-size-2);
+}
+
+main {
+  overflow: hidden auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  container-type: size;
+  scrollbar-width: thin;
+  /*
+  Even though \\'transform: translateZ(1px)\\' doesn't have a visual effect,
+  it puts \\'main\\' element into another rendering layer which somehow
+  fixes the \\'.input-form\\' jumping on scroll issue.
+  */
+  transform: translateZ(1px);
+  scroll-timeline: --scroll-timeline y;
+}
+
+.empty-state-container {
+  flex-grow: 1;
+  display: grid;
+  align-items: center;
+  justify-content: center;
+  font: var(--sys-typescale-headline4);
+  gap: var(--sys-size-8);
+  padding: var(--sys-size-4);
+  max-width: var(--sys-size-33);
+
+  /* Prevents the container from jumping when the scrollbar is shown */
+  /* 688px is the max width of the input form + left and right paddings: var(--sys-size-36) + 2 * var(--sys-size-5)  */
+  @container (width > 688px) {
+    --half-scrollbar-width: calc((100cqw - 100%) / 2);
+
+    margin-left: var(--half-scrollbar-width);
+    margin-right: calc(-1 * var(--half-scrollbar-width));
+  }
+
+  .header {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    align-self: end;
+    gap: var(--sys-size-5);
+
+    .icon {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: var(--sys-size-14);
+      width: var(--sys-size-14);
+      border-radius: var(--sys-shape-corner-small);
+      background: linear-gradient(
+        135deg,
+        var(--sys-color-gradient-primary),
+        var(--sys-color-gradient-tertiary)
+      );
+    }
+
+    h1 {
+      font: var(--sys-typescale-headline4);
+    }
+
+    p {
+      text-align: center;
+      font: var(--sys-typescale-body4-regular);
+    }
+  }
+
+  .empty-state-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-5);
+    align-items: center;
+    justify-content: center;
+    align-self: start;
+  }
+}
+
+.gemini {
+  .empty-state-container {
+    padding: var(--sys-size-8);
+  }
+
+  .empty-state-container .icon {
+    display: none;
+  }
+
+  .empty-state-container .header {
+    align-items: flex-start;
+    line-height: var(--sys-size-4);
+  }
+
+  .empty-state-content {
+    align-items: flex-start
+  }
+
+  .empty-state-container .greeting {
+    font-size: var(--sys-size-10);
+    color: var(--sys-color-primary);
+  }
+
+  .empty-state-container .cta {
+    font-size: var(--sys-size-10);
+  }
+
+  main {
+    align-items: flex-start;
+  }
+}
+
+.change-summary {
+  background-color: var(--sys-color-surface3);
+  border-radius: var(--sys-shape-corner-medium-small);
+  position: relative;
+  margin: 0 var(--sys-size-5) var(--sys-size-7) var(--sys-size-5);
+  padding: 0 var(--sys-size-5);
+
+  &.saved-to-disk {
+    pointer-events: none;
+  }
+
+  & .header-container {
+    display: flex;
+    align-items: center;
+    gap: var(--sys-size-3);
+    height: var(--sys-size-14);
+    padding-left: var(--sys-size-3);
+
+    devtools-spinner {
+      width: var(--sys-size-6);
+      height: var(--sys-size-6);
+      margin-left: var(--sys-size-3);
+      margin-right: var(--sys-size-3);
+    }
+
+    & devtools-icon.summary-badge {
+      width: var(--sys-size-8);
+      height: var(--sys-size-8);
+    }
+
+    & .green-bright-icon {
+      color: var(--sys-color-green-bright);
+    }
+
+    & .on-tonal-icon {
+      color: var(--sys-color-on-tonal-container);
+    }
+
+    & .header-text {
+      font: var(--sys-typescale-body4);
+      color: var(--sys-color-on-surface);
+      white-space: nowrap;
+      overflow-x: hidden;
+      text-overflow: ellipsis;
+    }
+
+    & .arrow {
+      margin-left: auto;
+    }
+
+    &::marker {
+      content: '';
+    }
+  }
+
+  &:not(.saved-to-disk, &[open]):hover::after {
+    content: '';
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-color: var(--sys-color-state-hover-on-subtle);
+  }
+
+  &[open]:not(.saved-to-disk) {
+    &::details-content {
+      height: fit-content;
+      padding: var(--sys-size-2) 0;
+      border-radius: inherit;
+    }
+
+    summary .arrow {
+      transform: rotate(180deg);
+    }
+  }
+
+  devtools-code-block {
+    margin-bottom: var(--sys-size-5);
+
+    --code-block-background-color: var(--sys-color-surface1);
+  }
+
+  .error-container {
+    display: flex;
+    align-items: center;
+    gap: var(--sys-size-3);
+    color: var(--sys-color-error);
+  }
+
+  .footer {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-between;
+    margin: var(--sys-size-5) 0 var(--sys-size-5) var(--sys-size-2);
+    gap: var(--sys-size-6) var(--sys-size-5);
+
+    .disclaimer-link {
+      align-self: center;
+    }
+
+    .left-side {
+      flex-grow: 1;
+      display: flex;
+      align-self: center;
+      gap: var(--sys-size-3);
+    }
+
+    .save-or-discard-buttons {
+      flex-grow: 1;
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--sys-size-3);
+    }
+
+    .change-workspace {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: var(--sys-size-3);
+      min-width: var(--sys-size-22);
+      flex: 1 1 40%;
+
+      .folder-name {
+        white-space: nowrap;
+        overflow-x: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    .loading-text-container {
+      margin-right: var(--sys-size-3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: var(--sys-size-3);
+    }
+
+    .apply-to-workspace-container {
+      display: flex;
+      align-items: center;
+      gap: var(--sys-size-3);
+      min-width: fit-content;
+      justify-content: flex-end;
+      flex-grow: 1;
+      flex-shrink: 1;
+
+      devtools-icon {
+        /* var(--sys-size-8) is too small and var(--sys-size-9) is too big. */
+        width: 18px;
+        height: 18px;
+        margin-left: var(--sys-size-2);
+      }
+    }
+  }
+}
+
+@keyframes reveal {
+  0%,
+  99% {
+    opacity: 100%;
+  }
+
+  100% {
+    opacity: 0%;
+  }
+}
+
+.sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 9999;
+}
+
+.chat-input-widget {
+  width: 100%;
+  max-width: var(--sys-size-36);
+  background-color: var(--sys-color-cdt-base-container);
+  /*
+  The \\'box-shadow\\' is a workaround to hide the content appearing between the \\'.input-form\\'
+  and the footer in some resolutions even though the \\'.input-form\\' has \\'bottom: 0\\'.
+  */
+  box-shadow: 0 var(--sys-size-1) var(--sys-color-cdt-base-container);
+
+  /* Prevents the input form from jumping when the scrollbar is shown */
+  /* 688px is the max width of the input form + left and right paddings: var(--sys-size-36) + 2 * var(--sys-size-5)  */
+  @container (width > 688px) {
+    --half-scrollbar-width: calc((100cqw - 100%) / 2);
+
+    margin-left: var(--half-scrollbar-width);
+    margin-right: calc(-1 * var(--half-scrollbar-width));
+  }
+
+  /* when there isn't enough space to view the messages,
+  do not overlay the input form on top of the messages */
+  /* height < var(--sys-size-27) */
+  @container (height < 224px) {
+    margin-top: var(--sys-size-4);
+    margin-bottom: var(--sys-size-4);
+    position: static;
+  }
+
+  @container --chat-ui-container (width < 400px) {
+    /*
+      The footer already adds necessary paddings for this state.
+      However, without the \\'padding-bottom\\' here, the outline in the bottom
+      is rendered behind the footer. So, we add 1px space here to make sure
+      that the outline is rendered fully.
+    */
+    padding-bottom: var(--sys-size-1);
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/chatView.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/ExportForAgentsDialog.js
+var ExportForAgentsDialog_exports = {};
+__export(ExportForAgentsDialog_exports, {
+  DEFAULT_VIEW: () => DEFAULT_VIEW4,
+  ExportForAgentsDialog: () => ExportForAgentsDialog,
+  StateType: () => StateType
+});
+import "../../ui/components/spinners/spinners.js";
+import * as Host2 from "../../core/host/host.js";
+import * as i18n7 from "../../core/i18n/i18n.js";
+import * as Buttons4 from "../../ui/components/buttons/buttons.js";
+import * as Snackbars3 from "../../ui/components/snackbars/snackbars.js";
+import * as UI4 from "../../ui/legacy/legacy.js";
+import * as Lit7 from "../../ui/lit/lit.js";
+import * as VisualLogging4 from "../../ui/visual_logging/visual_logging.js";
+
+// gen/front_end/panels/ai_assistance/components/exportForAgentsDialog.css.js
+var exportForAgentsDialog_css_default = `/*
+ * Copyright 2026 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope to (devtools-widget > *) {
+  :scope {
+    width: 100%;
+    box-shadow: none;
+    padding: var(--sys-size-8);
+    background-color: var(--sys-color-surface);
+    border-radius: var(--sys-shape-corner-medium);
+  }
+
+  .export-for-agents-dialog {
+    width: var(--sys-size-33); /* 512px */
+    max-width: 100%; /* deal with the dialog being squashed on smaller devices */
+  }
+
+  .export-for-agents-dialog header {
+    margin-bottom: var(--sys-size-6);
+
+    h1 {
+      font: var(--sys-typescale-headline5);
+      margin: 0;
+      color: var(--sys-color-on-surface);
+    }
+  }
+
+  .export-for-agents-dialog .state-selection {
+    display: flex;
+    gap: var(--sys-size-5);
+    margin: var(--sys-size-7) 0;
+  }
+
+  .export-for-agents-dialog .state-selection label {
+    display: flex;
+    align-items: center;
+    gap: var(--sys-size-2);
+    cursor: pointer;
+    font: var(--sys-typescale-body3-regular);
+
+    input {
+      /* Remove the margin on radio buttons so that the text and the
+       * radio button are properly aligned vertically. */
+      margin-bottom: 0;
+    }
+  }
+
+  .export-for-agents-dialog textarea {
+    width: 100%;
+    min-height: var(--sys-size-30); /* 288px */
+    max-height: var(--sys-size-34); /* 512px */
+    resize: none;
+    padding: var(--sys-size-5);
+    box-sizing: border-box;
+    font-family: var(--monospace-font-family);
+    font-size: var(--monospace-font-size);
+    background-color: var(--sys-color-surface5);
+    color: var(--sys-color-on-surface);
+    border-radius: var(--sys-shape-corner-small);
+    border: none;
+  }
+
+  main {
+    position: relative;
+  }
+
+  .prompt-loading {
+    position: absolute;
+    padding: var(--sys-size-5);
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--sys-size-5);
+  }
+
+  .export-for-agents-dialog .disclaimer {
+    margin-top: var(--sys-size-5);
+    font: var(--sys-typescale-body4-regular);
+    color: var(--sys-color-on-surface-subtle);
+  }
+
+  .export-for-agents-dialog footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--sys-size-6);
+  }
+
+  .export-for-agents-dialog .right-buttons {
+    display: flex;
+    gap: var(--sys-size-5);
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/exportForAgentsDialog.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/ExportForAgentsDialog.js
+var { html: html7, render: render4 } = Lit7;
+var UIStrings3 = {
+  /**
+   * @description Title for the export for agents dialog.
+   */
+  exportForAgents: "Copy to coding agent",
+  /**
+   * @description Button text for copying to clipboard.
+   */
+  copyToClipboard: "Copy to clipboard",
+  /**
+   * @description Text displayed in a toast to indicate that the content was copied to the clipboard.
+   */
+  copiedToClipboard: "Copied to clipboard",
+  /**
+   * @description Label for the 'summary prompt' radio button in the export for agents dialog.
+   */
+  asPrompt: "Summary prompt",
+  /**
+   * @description Label for the 'full conversation' radio button in the export for agents dialog.
+   */
+  asMarkdown: "Full conversation",
+  /**
+   * @description Button text for saving content as a markdown file.
+   */
+  saveAsMarkdown: "Save as\u2026",
+  /**
+   * @description Text displayed while the summary is being generated.
+   */
+  generatingSummary: "Generating summary\u2026",
+  /**
+   * @description Disclaimer text for the export for agents dialog.
+   */
+  disclaimer: "This is an experimental AI feature and won\u2019t always get it right. Double check this text before pasting into another tool."
+};
+var str_3 = i18n7.i18n.registerUIStrings("panels/ai_assistance/components/ExportForAgentsDialog.ts", UIStrings3);
+var i18nString3 = i18n7.i18n.getLocalizedString.bind(void 0, str_3);
+var StateType;
+(function(StateType2) {
+  StateType2["PROMPT"] = "prompt";
+  StateType2["CONVERSATION"] = "conversation";
+})(StateType || (StateType = {}));
+var DEFAULT_STATE_TYPE = "prompt";
+var DEFAULT_VIEW4 = (input, _output, target) => {
+  const isPrompt = input.state.activeType === "prompt";
+  const buttonText = isPrompt ? i18nString3(UIStrings3.copyToClipboard) : i18nString3(UIStrings3.saveAsMarkdown);
+  const exportText = isPrompt ? input.state.promptText : input.state.conversationText;
+  render4(html7`
+    <style>${exportForAgentsDialog_css_default}</style>
+    <div class="export-for-agents-dialog" jslog=${VisualLogging4.dialog("ai-export-for-agents")}>
+      <header>
+        <h1 id="export-for-agents-dialog-title" tabindex="-1">
+          ${i18nString3(UIStrings3.exportForAgents)}
+        </h1>
+      </header>
+      <div class="state-selection" role="radiogroup" aria-labelledby="export-for-agents-dialog-title">
+        <label>
+          <input
+            type="radio"
+            value="prompt"
+            name="export-state"
+            .checked=${isPrompt}
+            autofocus
+            aria-label=${i18nString3(UIStrings3.asPrompt)}
+            @change=${() => input.onStateChange(
+    "prompt"
+    /* StateType.PROMPT */
+  )}
+          >
+          ${i18nString3(UIStrings3.asPrompt)}
+        </label>
+        <label>
+          <input
+            type="radio"
+            value="conversation"
+            name="export-state"
+            .checked=${!isPrompt}
+            aria-label=${i18nString3(UIStrings3.asMarkdown)}
+            @change=${() => input.onStateChange(
+    "conversation"
+    /* StateType.CONVERSATION */
+  )}
+          >
+          ${i18nString3(UIStrings3.asMarkdown)}
+        </label>
+      </div>
+      <main>
+        ${isPrompt && input.state.isPromptLoading ? html7`
+          <span class="prompt-loading">
+            <devtools-spinner></devtools-spinner>
+            ${i18nString3(UIStrings3.generatingSummary)}
+          </span>
+          ` : Lit7.nothing}
+        ${isPrompt ? html7`<textarea class="prompt" readonly .value=${input.state.isPromptLoading ? "" : exportText}></textarea>` : html7`<textarea class="conversation" readonly .value=${exportText}></textarea>`}
+      </main>
+      <div class="disclaimer">${i18nString3(UIStrings3.disclaimer)}</div>
+      <footer>
+        <div class="right-buttons">
+          <devtools-button
+            @click=${input.onButtonClick}
+            .jslogContext=${input.jslogContext}
+            .variant=${"primary"}
+            .disabled=${isPrompt && input.state.isPromptLoading}
+            .accessibleLabel=${buttonText}
+          >
+            ${buttonText}
+          </devtools-button>
+        </div>
+      </footer>
+    </div>
+  `, target);
+};
+var ExportForAgentsDialog = class _ExportForAgentsDialog extends UI4.Widget.VBox {
+  static #lastSelectedType = DEFAULT_STATE_TYPE;
+  #view;
+  #dialog;
+  #state;
+  #onConversationSaveAs;
+  constructor(options, view = DEFAULT_VIEW4) {
+    super();
+    this.#dialog = options.dialog;
+    this.#state = {
+      activeType: _ExportForAgentsDialog.#lastSelectedType,
+      promptText: typeof options.promptText === "string" ? options.promptText : "",
+      conversationText: options.markdownText,
+      isPromptLoading: typeof options.promptText !== "string"
+    };
+    this.#onConversationSaveAs = options.onConversationSaveAs;
+    this.#view = view;
+    if (typeof options.promptText !== "string") {
+      void options.promptText.then((promptText) => {
+        this.#state.promptText = promptText;
+        this.#state.isPromptLoading = false;
+        this.requestUpdate();
+      });
+    }
+    this.requestUpdate();
+  }
+  static clearPersistedViewState() {
+    _ExportForAgentsDialog.#lastSelectedType = DEFAULT_STATE_TYPE;
+  }
+  #onStateChange = (newState) => {
+    this.#state.activeType = newState;
+    _ExportForAgentsDialog.#lastSelectedType = newState;
+    this.requestUpdate();
+  };
+  performUpdate() {
+    let onButtonClick;
+    let jslogContext = "";
+    switch (this.#state.activeType) {
+      case "prompt":
+        jslogContext = "ai-export-for-agents.copy-to-clipboard";
+        onButtonClick = (event) => {
+          event.preventDefault();
+          Host2.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(this.#state.promptText);
+          const snackbar = Snackbars3.Snackbar.Snackbar.show({
+            message: i18nString3(UIStrings3.copiedToClipboard)
+          });
+          snackbar.setAttribute("aria-label", i18nString3(UIStrings3.copiedToClipboard));
+          this.#dialog.hide();
+        };
+        break;
+      case "conversation":
+        jslogContext = "ai-export-for-agents.save-as-markdown";
+        onButtonClick = () => {
+          this.#dialog.hide();
+          this.#onConversationSaveAs();
+        };
+        break;
+    }
+    const viewInput = {
+      onButtonClick,
+      state: this.#state,
+      onStateChange: this.#onStateChange,
+      jslogContext
+    };
+    this.#view(viewInput, void 0, this.contentElement);
+  }
+  static show({ promptText, markdownText, onConversationSaveAs }) {
+    const dialog3 = new UI4.Dialog.Dialog();
+    dialog3.setAriaLabel(i18nString3(UIStrings3.exportForAgents));
+    dialog3.setOutsideClickCallback((ev) => {
+      ev.consume(true);
+      dialog3.hide();
+    });
+    dialog3.addCloseButton();
+    dialog3.setSizeBehavior(
+      "MeasureContent"
+      /* UI.GlassPane.SizeBehavior.MEASURE_CONTENT */
+    );
+    dialog3.setDimmed(true);
+    const exportDialog = new _ExportForAgentsDialog({ dialog: dialog3, promptText, markdownText, onConversationSaveAs });
+    exportDialog.show(dialog3.contentElement);
+    void exportDialog.updateComplete.then(() => {
+      dialog3.show();
+    });
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/ChatView.js
+var { ref: ref4, repeat, classMap } = Directives6;
+var { widget: widget3 } = UI5.Widget;
+var UIStringsNotTranslate3 = {
+  /**
+   * @description Text for the empty state of the AI assistance panel.
+   */
+  emptyStateText: "How can I help you?",
+  /**
+   * @description Text for the empty state of the Gemini panel.
+   */
+  emptyStateTextGemini: "Where should we start?"
+};
+var lockedString4 = i18n9.i18n.lockedString;
+var SCROLL_ROUNDING_OFFSET2 = 1;
+var DEFAULT_VIEW5 = (input, output, target) => {
+  const chatUiClasses = classMap({
+    "chat-ui": true,
+    gemini: AiAssistanceModel7.AiUtils.isGeminiBranding()
+  });
+  const inputWidgetClasses = classMap({
+    "chat-input-widget": true,
+    sticky: !input.isReadOnly
+  });
+  render5(html8`
+      <style>${chatView_css_default}</style>
+      <div class=${chatUiClasses}>
+        <main @scroll=${input.handleScroll} ${ref4((element) => {
+    output.mainElement = element;
+  })}>
+          ${input.messages.length > 0 ? html8`
+            <div class="messages-container" ${ref4(input.handleMessageContainerRef)}>
+              ${repeat(input.messages, (message) => message.id, (message, index) => {
+    const prevMessage = index > 0 ? input.messages[index - 1] : null;
+    const prompt = message.entity === "model" && prevMessage?.entity === "user" ? prevMessage.text : "";
+    return widget3(ChatMessage, {
+      message,
+      isLoading: input.isLoading && index === input.messages.length - 1,
+      isReadOnly: input.isReadOnly,
+      canShowFeedbackForm: input.canShowFeedbackForm,
+      markdownRenderer: input.markdownRenderer,
+      isLastMessage: index === input.messages.length - 1,
+      isFirstMessage: index === 0,
+      prompt,
+      onSuggestionClick: input.handleSuggestionClick,
+      onFeedbackSubmit: input.onFeedbackSubmit,
+      onCopyResponseClick: input.onCopyResponseClick,
+      onExportClick: input.exportForAgentsClick,
+      walkthrough: {
+        ...input.walkthrough
+      }
+    });
+  })}
+            </div>
+          ` : html8`
+            <div class="empty-state-container">
+              <div class="header">
+                <div class="icon">
+                  <devtools-icon
+                    name="smart-assistant"
+                  ></devtools-icon>
+                </div>
+                ${AiAssistanceModel7.AiUtils.isGeminiBranding() ? html8`
+                    <h1 class='greeting'>Hello</h1>
+                    <p class='cta'>${lockedString4(UIStringsNotTranslate3.emptyStateTextGemini)}</p>
+                  ` : html8`<h1>${lockedString4(UIStringsNotTranslate3.emptyStateText)}</h1>`}
+              </div>
+              <div class="empty-state-content">
+                ${input.emptyStateSuggestions.map(({ title, jslogContext }) => {
+    return html8`<devtools-button
+                    class="suggestion"
+                    @click=${() => input.handleSuggestionClick(title)}
+                    .data=${{
+      variant: "outlined",
+      size: "REGULAR",
+      title,
+      jslogContext: jslogContext ?? "suggestion",
+      disabled: input.isTextInputDisabled
+    }}
+                  >${title}</devtools-button>`;
+  })}
+              </div>
+            </div>
+          `}
+          <devtools-widget class=${inputWidgetClasses} ${widget3(ChatInput, {
+    isLoading: input.isLoading,
+    blockedByCrossOrigin: input.blockedByCrossOrigin,
+    isTextInputDisabled: input.isTextInputDisabled,
+    inputPlaceholder: input.inputPlaceholder,
+    disclaimerText: input.disclaimerText,
+    context: input.context,
+    isContextSelected: input.isContextSelected,
+    inspectElementToggled: input.inspectElementToggled,
+    multimodalInputEnabled: input.multimodalInputEnabled ?? false,
+    conversationType: input.conversationType,
+    uploadImageInputEnabled: input.uploadImageInputEnabled ?? false,
+    isReadOnly: input.isReadOnly,
+    textInputValue: input.textInputValue,
+    onTextChange: input.onTextChange,
+    onContextClick: input.onContextClick,
+    onInspectElementClick: input.onInspectElementClick,
+    onTextSubmit: input.onTextSubmit,
+    onCancelClick: input.onCancelClick,
+    onNewConversation: input.onNewConversation,
+    onContextRemoved: input.onContextRemoved,
+    onContextAdd: input.onContextAdd
+  })} ${ref4((element) => {
+    output.input = element;
+  })}></devtools-widget>
+        </main>
+      </div>
+    `, target);
+};
+var ChatView = class extends HTMLElement {
+  #shadow = this.attachShadow({ mode: "open" });
+  #scrollTop;
+  #props;
+  #messagesContainerElement;
+  #output = {};
+  #messagesContainerResizeObserver = new ResizeObserver(() => this.#handleMessagesContainerResize());
+  /**
+   * Indicates whether the chat scroll position should be pinned to the bottom.
+   *
+   * This is true when:
+   *   - The scroll is at the very bottom, allowing new messages to push the scroll down automatically.
+   *   - The panel is initially rendered and the user hasn't scrolled yet.
+   *
+   * It is set to false when the user scrolls up to view previous messages.
+   */
+  #pinScrollToBottom = true;
+  /**
+   * Indicates whether the scroll event originated from code
+   * or a user action. When set to `true`, `handleScroll` will ignore the event,
+   * allowing it to only handle user-driven scrolls and correctly decide
+   * whether to pin the content to the bottom.
+   */
+  #isProgrammaticScroll = false;
+  #view;
+  #cachedSummary = null;
+  constructor(props, view = DEFAULT_VIEW5) {
+    super();
+    this.#props = props;
+    this.#view = view;
+  }
+  set props(props) {
+    this.#props = props;
+    this.#render();
+  }
+  connectedCallback() {
+    this.#render();
+    if (this.#messagesContainerElement) {
+      this.#messagesContainerResizeObserver.observe(this.#messagesContainerElement);
+    }
+  }
+  disconnectedCallback() {
+    this.#messagesContainerResizeObserver.disconnect();
+  }
+  focusTextInput() {
+    const textArea = this.#shadow.querySelector(".chat-input");
+    if (!textArea) {
+      return;
+    }
+    textArea.focus();
+  }
+  setInputValue(text) {
+    this.#output.input?.getWidget()?.setInputValue(text);
+  }
+  restoreScrollPosition() {
+    if (this.#scrollTop === void 0) {
+      return;
+    }
+    if (!this.#output.mainElement) {
+      return;
+    }
+    this.#setMainElementScrollTop(this.#scrollTop);
+  }
+  scrollToBottom() {
+    if (!this.#output.mainElement) {
+      return;
+    }
+    this.#setMainElementScrollTop(this.#output.mainElement.scrollHeight);
+  }
+  #handleMessagesContainerResize() {
+    if (!this.#pinScrollToBottom) {
+      return;
+    }
+    if (!this.#output.mainElement) {
+      return;
+    }
+    if (this.#pinScrollToBottom) {
+      this.#setMainElementScrollTop(this.#output.mainElement.scrollHeight);
+    }
+  }
+  #setMainElementScrollTop(scrollTop) {
+    if (!this.#output.mainElement) {
+      return;
+    }
+    this.#scrollTop = scrollTop;
+    this.#isProgrammaticScroll = true;
+    this.#output.mainElement.scrollTop = scrollTop;
+  }
+  #handleMessageContainerRef = (el) => {
+    this.#messagesContainerElement = el;
+    if (el) {
+      this.#messagesContainerResizeObserver.observe(el);
+    } else {
+      this.#pinScrollToBottom = true;
+      this.#messagesContainerResizeObserver.disconnect();
+    }
+  };
+  #handleScroll = (ev) => {
+    if (!ev.target || !(ev.target instanceof HTMLElement)) {
+      return;
+    }
+    if (this.#isProgrammaticScroll) {
+      this.#isProgrammaticScroll = false;
+      return;
+    }
+    this.#scrollTop = ev.target.scrollTop;
+    this.#pinScrollToBottom = ev.target.scrollTop + ev.target.clientHeight + SCROLL_ROUNDING_OFFSET2 > ev.target.scrollHeight;
+  };
+  #handleSuggestionClick = (suggestion) => {
+    this.#output.input?.getWidget()?.setInputValue(suggestion);
+    this.#render();
+    this.focusTextInput();
+    Host3.userMetrics.actionTaken(Host3.UserMetrics.Action.AiAssistanceDynamicSuggestionClicked);
+  };
+  async #getSummary() {
+    const cacheKey = this.#props.conversationMarkdown.replace(/\*\*Export Timestamp \(UTC\):\*\* .*\n\n/, "");
+    if (this.#cachedSummary?.markdown === cacheKey) {
+      return this.#cachedSummary.summary;
+    }
+    try {
+      const summary = await this.#props.generateConversationSummary(this.#props.conversationMarkdown);
+      this.#cachedSummary = { markdown: cacheKey, summary };
+      return summary;
+    } catch (err) {
+      console.error(err);
+      return "Failed to generate summary.";
+    }
+  }
+  async #exportForAgentsClick() {
+    const summaryPromise = this.#getSummary();
+    void ExportForAgentsDialog.show({
+      promptText: summaryPromise,
+      markdownText: this.#props.conversationMarkdown,
+      onConversationSaveAs: this.#props.onExportConversation ?? (async () => {
+      })
+    });
+  }
+  #render() {
+    this.#view({
+      ...this.#props,
+      handleScroll: this.#handleScroll,
+      handleSuggestionClick: this.#handleSuggestionClick,
+      handleMessageContainerRef: this.#handleMessageContainerRef,
+      exportForAgentsClick: this.#exportForAgentsClick.bind(this)
+    }, this.#output, this.#shadow);
+  }
+};
+customElements.define("devtools-ai-chat-view", ChatView);
+
+// gen/front_end/panels/ai_assistance/components/DisabledWidget.js
+var DisabledWidget_exports = {};
+__export(DisabledWidget_exports, {
+  DEFAULT_VIEW: () => DEFAULT_VIEW6,
+  DisabledWidget: () => DisabledWidget
+});
+import * as Host4 from "../../core/host/host.js";
+import * as i18n11 from "../../core/i18n/i18n.js";
+import * as Root from "../../core/root/root.js";
+import * as uiI18n from "../../ui/i18n/i18n.js";
+import * as UI6 from "../../ui/legacy/legacy.js";
+import { html as html9, render as render6 } from "../../ui/lit/lit.js";
+import * as VisualLogging5 from "../../ui/visual_logging/visual_logging.js";
+
+// gen/front_end/panels/ai_assistance/components/disabledWidget.css.js
+var disabledWidget_css_default = `/*
+ * Copyright 2025 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope to (devtools-widget > *) {
+  .disabled-view {
+    display: flex;
+    max-width: var(--sys-size-34);
+    border-radius: var(--sys-shape-corner-small);
+    box-shadow: var(--sys-elevation-level3);
+    background-color: var(--app-color-card-background);
+    font: var(--sys-typescale-body4-regular);
+    text-wrap: pretty;
+    padding: var(--sys-size-6) var(--sys-size-8);
+    margin: var(--sys-size-4);
+    line-height: var(--sys-size-9);
+
+    .disabled-view-icon-container {
+      flex-shrink: 0;
+      border-radius: var(--sys-shape-corner-extra-small);
+      width: var(--sys-size-9);
+      height: var(--sys-size-9);
+      background: linear-gradient(
+        135deg,
+        var(--sys-color-gradient-primary),
+        var(--sys-color-gradient-tertiary)
+      );
+      margin-right: var(--sys-size-5);
+
+      devtools-icon {
+        margin: var(--sys-size-2);
+        width: var(--sys-size-8);
+        height: var(--sys-size-8);
+      }
+    }
+  }
+
+  .link {
+    color: var(--text-link);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/disabledWidget.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/DisabledWidget.js
+var UIStrings4 = {
+  /**
+   * @description The error message when the user is not signed in to Chrome.
+   */
+  notLoggedIn: "This feature is only available when you are signed in to Chrome with your Google account",
+  /**
+   * @description Message shown when the user is offline.
+   */
+  offline: "Check your internet connection and try again",
+  /**
+   * @description Text for a link to Chrome DevTools Settings.
+   */
+  settingsLink: "AI assistance in Settings",
+  /**
+   * @description Text for asking the user to turn the AI assistance feature in settings first before they are able to use it.
+   * @example {AI assistance in Settings} PH1
+   */
+  turnOnForStyles: "Turn on {PH1} to get help with understanding CSS styles",
+  /**
+   * @description Text for asking the user to turn the AI assistance feature in settings first before they are able to use it.
+   * @example {AI assistance in Settings} PH1
+   */
+  turnOnForStylesAndRequests: "Turn on {PH1} to get help with styles and network requests",
+  /**
+   * @description Text for asking the user to turn the AI assistance feature in settings first before they are able to use it.
+   * @example {AI assistance in Settings} PH1
+   */
+  turnOnForStylesRequestsAndFiles: "Turn on {PH1} to get help with styles, network requests, and files",
+  /**
+   * @description Text for asking the user to turn the AI assistance feature in settings first before they are able to use it.
+   * @example {AI assistance in Settings} PH1
+   */
+  turnOnForStylesRequestsPerformanceAndFiles: "Turn on {PH1} to get help with styles, network requests, performance, and files",
+  /**
+   * @description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
+   */
+  notAvailableInIncognitoMode: "AI assistance is not available in Incognito mode or Guest mode"
+};
+var str_4 = i18n11.i18n.registerUIStrings("panels/ai_assistance/components/DisabledWidget.ts", UIStrings4);
+var i18nString4 = i18n11.i18n.getLocalizedString.bind(void 0, str_4);
+function renderAidaUnavailableContents(aidaAvailability) {
+  switch (aidaAvailability) {
+    case "no-account-email":
+    case "sync-is-paused": {
+      return html9`${i18nString4(UIStrings4.notLoggedIn)}`;
+    }
+    case "no-internet": {
+      return html9`${i18nString4(UIStrings4.offline)}`;
+    }
+  }
+}
+function renderConsentViewContents(hostConfig) {
+  if (hostConfig.isOffTheRecord) {
+    return html9`${i18nString4(UIStrings4.notAvailableInIncognitoMode)}`;
+  }
+  const settingsLink = document.createElement("span");
+  settingsLink.textContent = i18nString4(UIStrings4.settingsLink);
+  settingsLink.classList.add("link");
+  UI6.ARIAUtils.markAsLink(settingsLink);
+  settingsLink.addEventListener("click", () => {
+    void UI6.ViewManager.ViewManager.instance().showView("chrome-ai");
+  });
+  settingsLink.setAttribute("jslog", `${VisualLogging5.action("open-ai-settings").track({ click: true })}`);
+  let consentViewContents;
+  if (hostConfig.devToolsAiAssistancePerformanceAgent?.enabled) {
+    consentViewContents = uiI18n.getFormatLocalizedString(str_4, UIStrings4.turnOnForStylesRequestsPerformanceAndFiles, { PH1: settingsLink });
+  } else if (hostConfig.devToolsAiAssistanceFileAgent?.enabled) {
+    consentViewContents = uiI18n.getFormatLocalizedString(str_4, UIStrings4.turnOnForStylesRequestsAndFiles, { PH1: settingsLink });
+  } else if (hostConfig.devToolsAiAssistanceNetworkAgent?.enabled) {
+    consentViewContents = uiI18n.getFormatLocalizedString(str_4, UIStrings4.turnOnForStylesAndRequests, { PH1: settingsLink });
+  } else {
+    consentViewContents = uiI18n.getFormatLocalizedString(str_4, UIStrings4.turnOnForStyles, { PH1: settingsLink });
+  }
+  return html9`${consentViewContents}`;
+}
+var DEFAULT_VIEW6 = (input, _output, target) => {
+  render6(html9`
+      <style>
+        ${disabledWidget_css_default}
+      </style>
+      <div class="disabled-view">
+        <div class="disabled-view-icon-container">
+          <devtools-icon name="smart-assistant"></devtools-icon>
+        </div>
+        <div>
+          ${input.aidaAvailability === "available" ? renderConsentViewContents(input.hostConfig) : renderAidaUnavailableContents(input.aidaAvailability)}
+        </div>
+      </div>
+    `, target);
+};
+var DisabledWidget = class extends UI6.Widget.Widget {
+  aidaAvailability = "no-account-email";
+  #view;
+  constructor(element, view = DEFAULT_VIEW6) {
+    super(element);
+    this.#view = view;
+  }
+  wasShown() {
+    super.wasShown();
+    void this.requestUpdate();
+  }
+  performUpdate() {
+    const hostConfig = Root.Runtime.hostConfig;
+    this.#view({
+      aidaAvailability: this.aidaAvailability,
+      hostConfig
+    }, {}, this.contentElement);
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/ExploreWidget.js
+var ExploreWidget_exports = {};
+__export(ExploreWidget_exports, {
+  DEFAULT_VIEW: () => DEFAULT_VIEW7,
+  ExploreWidget: () => ExploreWidget
+});
+import * as i18n13 from "../../core/i18n/i18n.js";
+import * as Root2 from "../../core/root/root.js";
+import * as UI7 from "../../ui/legacy/legacy.js";
+import { html as html10, render as render7 } from "../../ui/lit/lit.js";
+import * as VisualLogging6 from "../../ui/visual_logging/visual_logging.js";
+
+// gen/front_end/panels/ai_assistance/components/exploreWidget.css.js
+var exploreWidget_css_default = `/*
+ * Copyright 2025 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope to (devtools-widget > *) {
+  .ai-assistance-explore-container {
+    &,
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    width: 100%;
+    height: fit-content;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: auto 0;
+    font: var(--sys-typescale-headline4);
+    gap: var(--sys-size-8);
+    padding: var(--sys-size-3);
+    overflow: auto;
+    scrollbar-gutter: stable both-edges;
+
+    .link {
+      padding: 0;
+      margin: 0 3px;
+    }
+
+    .header {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+      justify-self: center;
+      gap: var(--sys-size-4);
+
+      .icon {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: var(--sys-size-14);
+        width: var(--sys-size-14);
+        border-radius: var(--sys-shape-corner-small);
+        background: linear-gradient(
+          135deg,
+          var(--sys-color-gradient-primary),
+          var(--sys-color-gradient-tertiary)
+        );
+      }
+
+      h1 {
+        font: var(--sys-typescale-headline4);
+      }
+
+      p {
+        text-align: center;
+        font: var(--sys-typescale-body4-regular);
+      }
+
+      .link {
+        font: var(--sys-typescale-body4-regular);
+      }
+    }
+
+    .content {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sys-size-5);
+      align-items: center;
+      justify-content: center;
+      justify-self: center;
+    }
+
+    .feature-card {
+      display: flex;
+      padding: var(--sys-size-4) var(--sys-size-6);
+      gap: 10px;
+      background-color: var(--sys-color-surface2);
+      border-radius: var(--sys-shape-corner-medium-small);
+      width: 100%;
+      align-items: center;
+
+      .feature-card-icon {
+        min-width: var(--sys-size-12);
+        min-height: var(--sys-size-12);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: var(--sys-color-tonal-container);
+        border-radius: var(--sys-shape-corner-full);
+
+        devtools-icon {
+          width: 18px;
+          height: 18px;
+        }
+      }
+
+      .feature-card-content {
+        h3 {
+          font: var(--sys-typescale-body3-medium);
+        }
+
+        p {
+          font: var(--sys-typescale-body4-regular);
+          line-height: 18px;
+        }
+      }
+    }
+  }
+
+  .ai-assistance-explore-footer {
+    flex-shrink: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-block: var(--sys-size-3);
+    font: var(--sys-typescale-body5-regular);
+    border-top: var(--sys-size-1) solid var(--sys-color-divider);
+    text-wrap: balance;
+    text-align: center;
+
+    p {
+      margin: 0;
+      padding: 0;
+    }
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/exploreWidget.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/ExploreWidget.js
+var UIStringsNotTranslate4 = {
+  /**
+   * @description Text for the empty state of the AI assistance panel when there is no agent selected.
+   */
+  Explore: "Explore AI assistance",
+  /**
+   * @description The footer disclaimer that links to more information about the AI feature.
+   */
+  learnAbout: "Learn about AI in DevTools"
+};
+var lockedString5 = i18n13.i18n.lockedString;
+var DEFAULT_VIEW7 = (input, _output, target) => {
+  function renderFeatureCardContent(featureCard) {
+    return html10`Open
+     <button
+       class="link"
+       role="link"
+       jslog=${VisualLogging6.link(featureCard.jslogContext).track({
+      click: true
+    })}
+       @click=${featureCard.onClick}
+     >${featureCard.panelName}</button>
+     ${featureCard.text}`;
+  }
+  render7(html10`
+      <style>
+        ${exploreWidget_css_default}
+      </style>
+      <div class="ai-assistance-explore-container">
+        <div class="header">
+          <div class="icon">
+            <devtools-icon name="smart-assistant"></devtools-icon>
+          </div>
+          <h1>${lockedString5(UIStringsNotTranslate4.Explore)}</h1>
+          <p>
+            To chat about an item, right-click and select${" "}
+            <strong>Ask AI</strong>.
+            <button
+              class="link"
+              role="link"
+              jslog=${VisualLogging6.link("open-ai-settings").track({ click: true })}
+              @click=${() => {
+    void UI7.ViewManager.ViewManager.instance().showView("chrome-ai");
+  }}
+            >${lockedString5(UIStringsNotTranslate4.learnAbout)}
+            </button>
+          </p>
+        </div>
+        <div class="content">
+          ${input.featureCards.map((featureCard) => html10`
+              <div class="feature-card">
+                <div class="feature-card-icon">
+                  <devtools-icon name=${featureCard.icon}></devtools-icon>
+                </div>
+                <div class="feature-card-content">
+                  <h3>${featureCard.heading}</h3>
+                  <p>${renderFeatureCardContent(featureCard)}</p>
+                </div>
+              </div>
+            `)}
+        </div>
+      </div>
+    `, target);
+};
+var ExploreWidget = class extends UI7.Widget.Widget {
+  #view;
+  constructor(element, view = DEFAULT_VIEW7) {
+    super(element);
+    this.#view = view;
+  }
+  wasShown() {
+    super.wasShown();
+    void this.requestUpdate();
+  }
+  performUpdate() {
+    const config = Root2.Runtime.hostConfig;
+    const featureCards = [];
+    if (config.devToolsFreestyler?.enabled && UI7.ViewManager.ViewManager.instance().hasView("elements")) {
+      featureCards.push({
+        icon: "brush-2",
+        heading: "CSS styles",
+        jslogContext: "open-elements-panel",
+        onClick: () => {
+          void UI7.ViewManager.ViewManager.instance().showView("elements");
+        },
+        panelName: "Elements",
+        text: "to ask about CSS styles"
+      });
+    }
+    if (config.devToolsAiAssistanceNetworkAgent?.enabled && UI7.ViewManager.ViewManager.instance().hasView("network")) {
+      featureCards.push({
+        icon: "arrow-up-down",
+        heading: "Network",
+        jslogContext: "open-network-panel",
+        onClick: () => {
+          void UI7.ViewManager.ViewManager.instance().showView("network");
+        },
+        panelName: "Network",
+        text: "to ask about a request's details"
+      });
+    }
+    if (config.devToolsAiAssistanceFileAgent?.enabled && UI7.ViewManager.ViewManager.instance().hasView("sources")) {
+      featureCards.push({
+        icon: "document",
+        heading: "Files",
+        jslogContext: "open-sources-panel",
+        onClick: () => {
+          void UI7.ViewManager.ViewManager.instance().showView("sources");
+        },
+        panelName: "Sources",
+        text: "to ask about a file's content"
+      });
+    }
+    if (config.devToolsAiAssistancePerformanceAgent?.enabled && UI7.ViewManager.ViewManager.instance().hasView("timeline")) {
+      featureCards.push({
+        icon: "performance",
+        heading: "Performance",
+        jslogContext: "open-performance-panel",
+        onClick: () => {
+          void UI7.ViewManager.ViewManager.instance().showView("timeline");
+        },
+        panelName: "Performance",
+        text: "to ask about a trace item"
+      });
+    }
+    this.#view({
+      featureCards
+    }, {}, this.contentElement);
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/OptInChangeDialog.js
+var OptInChangeDialog_exports = {};
+__export(OptInChangeDialog_exports, {
+  DEFAULT_VIEW: () => DEFAULT_VIEW8,
+  OptInChangeDialog: () => OptInChangeDialog
+});
+import * as i18n15 from "../../core/i18n/i18n.js";
+import * as Root3 from "../../core/root/root.js";
+import * as Buttons6 from "../../ui/components/buttons/buttons.js";
+import * as UI8 from "../../ui/legacy/legacy.js";
+import * as Lit8 from "../../ui/lit/lit.js";
+import * as VisualLogging7 from "../../ui/visual_logging/visual_logging.js";
+
+// gen/front_end/panels/ai_assistance/components/optInChangeDialog.css.js
+var optInChangeDialog_css_default = `/*
+ * Copyright 2026 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+@scope to (devtools-widget > *) {
+  :scope {
+    width: 100%;
+    box-shadow: none;
+    padding: var(--sys-size-8);
+    background-color: var(--sys-color-surface);
+    border-radius: var(--sys-shape-corner-medium);
+  }
+
+  .opt-in-change-dialog {
+    width: var(--sys-size-33);
+    max-width: 100%;
+  }
+
+  header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--sys-size-8);
+    margin-bottom: var(--sys-size-8);
+
+    h1 {
+      margin: 0;
+      color: var(--sys-color-on-surface);
+      font: var(--sys-typescale-headline5);
+    }
+
+    .header-icon-container {
+      background: linear-gradient(
+        135deg,
+        var(--sys-color-gradient-primary),
+        var(--sys-color-gradient-tertiary)
+      );
+      border-radius: var(--sys-size-4);
+      height: var(--sys-size-14);
+      width: var(--sys-size-14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      devtools-icon {
+        width: var(--sys-size-9);
+        height: var(--sys-size-9);
+      }
+    }
+  }
+
+  main {
+    background-color: var(--sys-color-surface4);
+    border-radius: var(--sys-shape-corner-medium-small);
+    padding: var(--sys-size-8);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-6);
+    margin-bottom: var(--sys-size-8);
+
+    .item {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: var(--sys-size-8);
+
+      devtools-icon {
+        width: var(--sys-size-8);
+        height: var(--sys-size-8);
+        flex-shrink: 0;
+        color: var(--sys-color-on-surface-subtle);
+      }
+
+      .text {
+        font: var(--sys-typescale-body4);
+        color: var(--sys-color-on-surface);
+      }
+    }
+  }
+
+  footer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+
+    .right-buttons {
+      display: flex;
+      gap: var(--sys-size-5);
+    }
+  }
+}
+
+/*# sourceURL=${import.meta.resolve("././components/optInChangeDialog.css")} */`;
+
+// gen/front_end/panels/ai_assistance/components/OptInChangeDialog.js
+var { html: html11, render: render8 } = Lit8;
+var UIStrings5 = {
+  /**
+   * @description Title for the opt-in change dialog.
+   */
+  title: "AI assistance just got better",
+  /**
+   * @description First point in the opt-in change dialog, describing the new integration.
+   */
+  integrationPoint: "AI assistance is now integrated with Application and Lighthouse panels, and pulls context from data sources simultaneously",
+  /**
+   * @description Second point in the opt-in change dialog, describing the new widgets.
+   */
+  widgetPoint: "Use widgets to verify results or jump to source data for select debugging cases",
+  /**
+   * @description Third point in the opt-in change dialog (disclaimer) for regular users.
+   */
+  privacyDisclaimer: "Chat messages, data accessible for this site via DevTools panels and Web APIs, and items you select such as network requests, files, and performance traces are sent to Google and may be seen by human reviewers to improve this feature. This is an experimental AI feature and won\u2019t always get it right.",
+  /**
+   * @description Third point in the opt-in change dialog (disclaimer) for enterprise users with logging disabled.
+   */
+  privacyDisclaimerEnterpriseNoLogging: "Chat messages, data accessible for this site via DevTools panels and Web APIs, and items you select such as network requests, files, and performance traces are sent to Google. The content submitted to and generated by this feature will not be used to improve Google\u2019s AI models. This is an experimental AI feature and won\u2019t always get it right.",
+  /**
+   * @description Button text for managing settings.
+   */
+  manageSettings: "Manage in settings",
+  /**
+   * @description Button text for acknowledging the changes.
+   */
+  gotIt: "Got it"
+};
+var str_5 = i18n15.i18n.registerUIStrings("panels/ai_assistance/components/OptInChangeDialog.ts", UIStrings5);
+var i18nString5 = i18n15.i18n.getLocalizedString.bind(void 0, str_5);
+var DEFAULT_VIEW8 = (input, _output, target) => {
+  const disclaimer = input.loggingEnabled ? i18nString5(UIStrings5.privacyDisclaimer) : i18nString5(UIStrings5.privacyDisclaimerEnterpriseNoLogging);
+  render8(html11`
+    <style>${optInChangeDialog_css_default}</style>
+    <div class="opt-in-change-dialog" jslog=${VisualLogging7.dialog("ai-v2-opt-in-change-dialog")}>
+      <header>
+        <div class="header-icon-container">
+          <devtools-icon name="smart-assistant" role="presentation"></devtools-icon>
+        </div>
+        <h1 tabindex="-1">
+          ${i18nString5(UIStrings5.title)}
+        </h1>
+      </header>
+      <main>
+        <div class="item">
+          <devtools-icon name="lightbulb-spark" role="presentation"></devtools-icon>
+          <div class="text">${i18nString5(UIStrings5.integrationPoint)}</div>
+        </div>
+        <div class="item">
+          <devtools-icon name="flowsheet" role="presentation"></devtools-icon>
+          <div class="text">${i18nString5(UIStrings5.widgetPoint)}</div>
+        </div>
+        <div class="item">
+          <devtools-icon name="google" role="presentation"></devtools-icon>
+          <div class="text">${disclaimer}</div>
+        </div>
+      </main>
+      <footer>
+        <div class="right-buttons">
+          <devtools-button
+            @click=${input.onManageSettings}
+            .jslogContext=${"ai-assistance-v2-opt-in.manage-settings"}
+            .variant=${"outlined"}
+            .accessibleLabel=${i18nString5(UIStrings5.manageSettings)}
+          >
+            ${i18nString5(UIStrings5.manageSettings)}
+          </devtools-button>
+          <devtools-button
+            @click=${input.onGotIt}
+            .jslogContext=${"ai-assistance-v2-opt-in.got-it"}
+            .variant=${"primary"}
+            .accessibleLabel=${i18nString5(UIStrings5.gotIt)}
+          >
+            ${i18nString5(UIStrings5.gotIt)}
+          </devtools-button>
+        </div>
+      </footer>
+    </div>
+  `, target);
+};
+var OptInChangeDialog = class _OptInChangeDialog extends UI8.Widget.VBox {
+  #view;
+  #onGotIt;
+  #onManageSettings;
+  constructor(options, view = DEFAULT_VIEW8) {
+    super();
+    this.#onGotIt = options.onGotIt;
+    this.#onManageSettings = options.onManageSettings;
+    this.#view = view;
+    this.requestUpdate();
+  }
+  performUpdate() {
+    const loggingEnabled = Root3.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue !== Root3.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
+    const viewInput = {
+      onGotIt: this.#onGotIt,
+      onManageSettings: this.#onManageSettings,
+      loggingEnabled
+    };
+    this.#view(viewInput, void 0, this.contentElement);
+  }
+  focusTitle() {
+    this.contentElement.querySelector("h1")?.focus();
+  }
+  static show(options) {
+    const dialog3 = new UI8.Dialog.Dialog();
+    dialog3.setAriaLabel(i18nString5(UIStrings5.title));
+    dialog3.setOutsideClickCallback((event) => event.consume(true));
+    dialog3.setCloseOnEscape(false);
+    dialog3.setSizeBehavior(
+      "MeasureContent"
+      /* UI.GlassPane.SizeBehavior.MEASURE_CONTENT */
+    );
+    dialog3.setDimmed(true);
+    const optInChangeDialog = new _OptInChangeDialog({
+      onGotIt: () => {
+        dialog3.hide();
+        options.onGotIt();
+      },
+      onManageSettings: () => {
+        dialog3.hide();
+        options.onManageSettings();
+      }
+    });
+    optInChangeDialog.show(dialog3.contentElement);
+    void optInChangeDialog.updateComplete.then(() => {
+      dialog3.show();
+      optInChangeDialog.focusTitle();
+    });
+  }
+};
+
+// gen/front_end/panels/ai_assistance/components/PerformanceAgentMarkdownRenderer.js
+import * as Common4 from "../../core/common/common.js";
+import * as SDK5 from "../../core/sdk/sdk.js";
+import * as Trace3 from "../../models/trace/trace.js";
+import * as Lit9 from "../../ui/lit/lit.js";
+import * as PanelsCommon5 from "../common/common.js";
+var { html: html12 } = Lit9.StaticHtml;
+var { until: until3 } = Lit9.Directives;
+var PerformanceAgentMarkdownRenderer = class extends MarkdownRendererWithCodeBlock {
+  mainFrameId;
+  lookupEvent;
+  constructor(mainFrameId = "", lookupEvent = () => null) {
+    super();
+    this.mainFrameId = mainFrameId;
+    this.lookupEvent = lookupEvent;
+  }
+  templateForToken(token) {
+    if (token.type === "link" && token.href.startsWith("#")) {
+      if (token.href.startsWith("#node-")) {
+        const nodeId = Number(token.href.replace("#node-", ""));
+        return html12`<span>${until3(this.#linkifyNode(nodeId, token.text).then((node) => node || token.text), token.text)}</span>`;
+      }
+      const event = this.lookupEvent(token.href.slice(1));
+      if (!event) {
+        return html12`${token.text}`;
+      }
+      let label = token.text;
+      let title = "";
+      if (Trace3.Types.Events.isSyntheticNetworkRequest(event)) {
+        title = event.args.data.url;
+      } else {
+        label += ` (${event.name})`;
+      }
+      return html12`<a href="#" draggable=false .title=${title} @click=${(e) => {
+        e.stopPropagation();
+        void Common4.Revealer.reveal(new SDK5.TraceObject.RevealableEvent(event));
+      }}>${label}</a>`;
+    }
+    return super.templateForToken(token);
+  }
+  // Taken from front_end/panels/timeline/components/insights/NodeLink.ts
+  // Would be nice to move the above component to somewhere that allows the AI
+  // Assistance panel to also use it.
+  async #linkifyNode(backendNodeId, label) {
+    if (backendNodeId === void 0) {
+      return;
+    }
+    const target = SDK5.TargetManager.TargetManager.instance().primaryPageTarget();
+    const domModel = target?.model(SDK5.DOMModel.DOMModel);
+    if (!domModel) {
+      return void 0;
+    }
+    const domNodesMap = await domModel.pushNodesByBackendIdsToFrontend(/* @__PURE__ */ new Set([backendNodeId]));
+    const node = domNodesMap?.get(backendNodeId);
+    if (!node) {
+      return;
+    }
+    if (node.frameId() !== this.mainFrameId) {
+      return;
+    }
+    const linkedNode = PanelsCommon5.DOMLinkifier.Linkifier.instance().linkify(node, { textContent: label });
+    return linkedNode;
+  }
+};
+
+// gen/front_end/panels/ai_assistance/ExportConversation.js
+var ExportConversation_exports = {};
+__export(ExportConversation_exports, {
+  saveToDisk: () => saveToDisk
+});
+import * as Platform4 from "../../core/platform/platform.js";
+import * as TextUtils3 from "../../core/text_utils/text_utils.js";
+import * as Workspace3 from "../../models/workspace/workspace.js";
+async function saveToDisk(conversation) {
+  const markdownContent = conversation.getConversationMarkdown();
+  const contentData = new TextUtils3.ContentData.ContentData(markdownContent, false, "text/markdown");
+  const titleFormatted = Platform4.StringUtilities.toSnakeCase(conversation.title || "");
+  const prefix = "devtools_";
+  const suffix = ".md";
+  const maxTitleLength = 63 - prefix.length - suffix.length;
+  const truncatedTitle = titleFormatted ? Platform4.StringUtilities.truncateToCodeUnitLength(titleFormatted, maxTitleLength) : "";
+  const finalTitle = truncatedTitle || "conversation";
+  const filename = `${prefix}${finalTitle}${suffix}`;
+  await Workspace3.FileManager.FileManager.instance().save(filename, contentData, true);
+  Workspace3.FileManager.FileManager.instance().close(filename);
+}
+
+// gen/front_end/panels/ai_assistance/AiAssistancePanel.js
+var { html: html13 } = Lit10;
+var { widget: widget4 } = UI9.Widget;
+var AI_ASSISTANCE_SEND_FEEDBACK = "https://crbug.com/364805393";
+var AI_ASSISTANCE_HELP = "https://developer.chrome.com/docs/devtools/ai-assistance";
+var WALKTHROUGH_SIDEBAR_BREAKPOINT = 700;
+var WALKTHROUGH_SIDEBAR_INITIAL_WIDTH = 400;
+var UIStrings6 = {
+  /**
+   * @description AI assistance UI text for creating a new chat.
+   */
+  newChat: "New chat",
+  /**
+   * @description AI assistance UI tooltip text for the help button.
+   */
+  help: "Help",
+  /**
+   * @description AI assistance UI tooltip text for the settings button (gear icon).
+   */
+  settings: "Settings",
+  /**
+   * @description AI assistance UI tooltip for sending feedback.
+   */
+  sendFeedback: "Send feedback",
+  /**
+   * @description Announcement text for screen readers when a new chat is created.
+   */
+  newChatCreated: "New chat created",
+  /**
+   * @description Announcement text for screen readers when the chat is deleted.
+   */
+  chatDeleted: "Chat deleted",
+  /**
+   * @description AI assistance UI text for selecting a history entry.
+   */
+  history: "History",
+  /**
+   * @description AI assistance UI text for deleting the current chat session from local history.
+   */
+  deleteChat: "Delete local chat",
+  /**
+   * @description AI assistance UI text for deleting all local history entries.
+   */
+  clearChatHistory: "Clear local chats",
+  /**
+   * @description AI assistance UI text explaining that the user has no past conversations.
+   */
+  noPastConversations: "No past conversations",
+  /**
+   * @description Placeholder text for an inactive text field. When active, it's used for the user's input to AI assistance.
+   */
+  followTheSteps: "Follow the steps above to ask a question",
+  /**
+   * @description Disclaimer text right after the chat input.
+   */
+  inputDisclaimerForEmptyState: "This is an experimental AI feature and won\u2019t always get it right.",
+  /**
+   * @description The message shown in a toast when the response is copied to the clipboard.
+   */
+  responseCopiedToClipboard: "Response copied to clipboard"
+};
+var UIStringsNotTranslate5 = {
+  /**
+   * @description Announcement text for screen readers when the conversation starts.
+   */
+  answerLoading: "Answer loading",
+  /**
+   * @description Announcement text for screen readers when the answer comes.
+   */
+  answerReady: "Answer ready",
+  /**
+   * @description Title for the first step of the walkthrough.
+   */
+  analyzingData: "Analyzing data",
+  /**
+   * @description Placeholder text for the input shown when the conversation is blocked because a cross-origin context was selected.
+   */
+  crossOriginError: "To talk about data from another origin, start a new chat",
+  /**
+   * @description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForStyling: "Ask a question about the selected element",
+  /**
+   * @description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForNetwork: "Ask a question about the selected network request",
+  /**
+   * @description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForFile: "Ask a question about the selected file",
+  /**
+   * @description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForPerformanceWithNoRecording: "Record a performance trace and select an item to ask a question",
+  /**
+   * @description Placeholder text for the chat UI input when there is no context selected.
+   */
+  inputPlaceholderForStylingNoContext: "Select an element to ask a question",
+  /**
+   * @description Placeholder text for the chat UI input when there is no context selected.
+   */
+  inputPlaceholderForNetworkNoContext: "Select a network request to ask a question",
+  /**
+   * @description Placeholder text for the chat UI input when there is no context selected.
+   */
+  inputPlaceholderForFileNoContext: "Select a file to ask a question",
+  /**
+   * @description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForPerformanceTrace: "Ask a question about the selected performance trace",
+  /**
+   *@description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForPerformanceTraceNoContext: "Record or select a performance trace to ask a question",
+  /**
+   *@description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForNoContext: "Ask AI Assistance",
+  /**
+   * @description Placeholder text for the chat UI input with branding Gemini (do not translate)
+   */
+  inputPlaceholderForNoContextBranded: "Ask Gemini",
+  /**
+   * @description Placeholder text for the chat UI input when AIAgent2 is enabled.
+   */
+  inputPlaceholderForV2: "Ask a question (AIAgent2 enabled)",
+  /**
+   * @description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForAccessibility: "Ask a question about the selected Lighthouse report",
+  /**
+   * @description Placeholder text for the chat UI input when there is no context selected.
+   */
+  inputPlaceholderForAccessibilityNoContext: "Generate a Lighthouse report to ask a question",
+  /**
+   * @description Disclaimer text right after the chat input.
+   */
+  inputDisclaimer: "Chat messages, data accessible for this site via DevTools panels and Web APIs, and items you select such as network requests, files, and performance traces are sent to Google and may be seen by human reviewers to improve this feature. This is an experimental AI feature and won\u2019t always get it right.",
+  /**
+   * @description Disclaimer text right after the chat input when enterprise logging is off.
+   */
+  inputDisclaimerEnterpriseNoLogging: "Chat messages, data accessible for this site via DevTools panels and Web APIs, and items you select such as network requests, files, and performance traces are sent to Google. The content submitted to and generated by this feature will not be used to improve Google\u2019s AI models. This is an experimental AI feature and won\u2019t always get it right."
+};
+var str_6 = i18n17.i18n.registerUIStrings("panels/ai_assistance/AiAssistancePanel.ts", UIStrings6);
+var i18nString6 = i18n17.i18n.getLocalizedString.bind(void 0, str_6);
+var lockedString6 = i18n17.i18n.lockedString;
+function selectedElementFilter(maybeNode) {
+  if (maybeNode) {
+    return maybeNode.nodeType() === Node.ELEMENT_NODE ? maybeNode : null;
+  }
+  return null;
+}
+async function getEmptyStateSuggestions(conversation) {
+  const context = conversation?.selectedContext;
+  if (context) {
+    const specialSuggestions = await context.getSuggestions();
+    if (specialSuggestions) {
+      return specialSuggestions;
+    }
+  }
+  if (!conversation?.type || conversation.isReadOnly) {
+    return [];
+  }
+  switch (conversation.type) {
+    case "freestyler":
+      return [
+        { title: "What can you help me with?", jslogContext: "styling-default" },
+        { title: "Why isn\u2019t this element visible?", jslogContext: "styling-default" },
+        { title: "How do I center this element?", jslogContext: "styling-default" }
+      ];
+    case "drjones-file":
+      return [
+        { title: "What does this script do?", jslogContext: "file-default" },
+        { title: "Is the script optimized for performance?", jslogContext: "file-default" },
+        { title: "Does the script handle user input safely?", jslogContext: "file-default" }
+      ];
+    case "accessibility":
+      return [
+        { title: "How can I fix accessibility issues on my page?", jslogContext: "accessibility-default" },
+        { title: "What accessibility issues exist on my page?", jslogContext: "accessibility-default" }
+      ];
+    case "drjones-network-request":
+      return [
+        { title: "Why is this network request taking so long?", jslogContext: "network-default" },
+        { title: "Are there any security headers present?", jslogContext: "network-default" },
+        { title: "Why is the request failing?", jslogContext: "network-default" }
+      ];
+    case "drjones-performance-full": {
+      return [
+        { title: "What performance issues exist with my page?", jslogContext: "performance-default" }
+      ];
+    }
+    case "none": {
+      return [
+        { title: "What can you help me with?", jslogContext: "empty" },
+        { title: "What performance issues exist on the page?", jslogContext: "empty" },
+        { title: "What are the slowest network requests on this page?", jslogContext: "empty" }
+      ];
+    }
+    case "storage": {
+      return [
+        { title: "How is localStorage used on this page?", jslogContext: "storage-default" },
+        { title: "How is sessionStorage used on this page?", jslogContext: "storage-default" },
+        { title: "What cookies are stored for this page?", jslogContext: "storage-default" }
+      ];
+    }
+    default:
+      Platform5.assertNever(conversation.type, "Unknown conversation type");
+  }
+}
+function createV2MarkdownRenderer(conversation) {
+  const options = {};
+  const primaryTarget = SDK6.TargetManager.TargetManager.instance().primaryPageTarget();
+  const domModel = primaryTarget?.model(SDK6.DOMModel.DOMModel);
+  const resourceTreeModel = primaryTarget?.model(SDK6.ResourceTreeModel.ResourceTreeModel);
+  const context = conversation?.selectedContext;
+  if (context instanceof AiAssistanceModel8.PerformanceTraceContext.PerformanceTraceContext) {
+    const focus = context.getItem();
+    options.mainFrameId = focus.parsedTrace.data.Meta.mainFrameId;
+    options.lookupTraceEvent = focus.lookupEvent.bind(focus);
+  } else {
+    if (domModel) {
+      options.mainDocumentURL = domModel.existingDocument()?.documentURL;
+    }
+    if (resourceTreeModel) {
+      options.mainFrameId = resourceTreeModel.mainFrame?.id;
+    }
+  }
+  return new AIv2MarkdownRenderer(options);
+}
+function getMarkdownRenderer(conversation) {
+  if (conversation?.type === "drjones-performance-full" && conversation.isReadOnly) {
+    return new PerformanceAgentMarkdownRenderer();
+  }
+  if (Root4.Runtime.hostConfig.devToolsAiV2Architecture?.enabled && conversation && !conversation.isReadOnly) {
+    return createV2MarkdownRenderer(conversation);
+  }
+  const context = conversation?.selectedContext;
+  if (context instanceof AiAssistanceModel8.PerformanceTraceContext.PerformanceTraceContext) {
+    const focus = context.getItem();
+    return new PerformanceAgentMarkdownRenderer(focus.parsedTrace.data.Meta.mainFrameId, focus.lookupEvent.bind(focus));
+  }
+  if (conversation?.type === "drjones-performance-full") {
+    return new PerformanceAgentMarkdownRenderer();
+  }
+  if (conversation?.type === "accessibility") {
+    const domModel = SDK6.TargetManager.TargetManager.instance().primaryPageTarget()?.model(SDK6.DOMModel.DOMModel);
+    const mainDocumentURL = domModel?.existingDocument()?.documentURL;
+    return new AccessibilityAgentMarkdownRenderer(mainDocumentURL);
+  }
+  return new MarkdownRendererWithCodeBlock();
+}
+var ViewState;
+(function(ViewState2) {
+  ViewState2["DISABLED_VIEW"] = "disabled-view";
+  ViewState2["CHAT_VIEW"] = "chat-view";
+  ViewState2["EXPLORE_VIEW"] = "explore-view";
+})(ViewState || (ViewState = {}));
+function toolbarView(input) {
+  return html13`
+    <div class="toolbar-container" role="toolbar" jslog=${VisualLogging8.toolbar()}>
+      <devtools-toolbar class="freestyler-left-toolbar" role="presentation">
+      ${input.showChatActions ? html13`<devtools-button
+          title=${i18nString6(UIStrings6.newChat)}
+          aria-label=${i18nString6(UIStrings6.newChat)}
+          .iconName=${"plus"}
+          .jslogContext=${"freestyler.new-chat"}
+          .variant=${"toolbar"}
+          @click=${input.onNewChatClick}></devtools-button>
+        <div class="toolbar-divider"></div>
+        <devtools-menu-button
+          title=${i18nString6(UIStrings6.history)}
+          aria-label=${i18nString6(UIStrings6.history)}
+          .iconName=${"history"}
+          .jslogContext=${"freestyler.history"}
+          .populateMenuCall=${input.populateHistoryMenu}
+        ></devtools-menu-button>` : Lit10.nothing}
+        ${input.showActiveConversationActions ? html13`
+          <devtools-button
+              title=${i18nString6(UIStrings6.deleteChat)}
+              aria-label=${i18nString6(UIStrings6.deleteChat)}
+              .iconName=${"bin"}
+              .jslogContext=${"freestyler.delete"}
+              .variant=${"toolbar"}
+              @click=${input.onDeleteClick}>
+          </devtools-button>` : Lit10.nothing}
+      </devtools-toolbar>
+      <devtools-toolbar class="freestyler-right-toolbar" role="presentation">
+        <devtools-link
+          class="toolbar-feedback-link"
+          title=${i18nString6(UIStrings6.sendFeedback)}
+          href=${AI_ASSISTANCE_SEND_FEEDBACK}
+          jslogcontext=${"freestyler.send-feedback"}
+        >${i18nString6(UIStrings6.sendFeedback)}</devtools-link>
+        <div class="toolbar-divider"></div>
+        <devtools-button
+          title=${i18nString6(UIStrings6.help)}
+          aria-label=${i18nString6(UIStrings6.help)}
+          .iconName=${"help"}
+          .jslogContext=${"freestyler.help"}
+          .variant=${"toolbar"}
+          @click=${input.onHelpClick}></devtools-button>
+        <devtools-button
+          title=${i18nString6(UIStrings6.settings)}
+          aria-label=${i18nString6(UIStrings6.settings)}
+          .iconName=${"gear"}
+          .jslogContext=${"freestyler.settings"}
+          .variant=${"toolbar"}
+          @click=${input.onSettingsClick}></devtools-button>
+      </devtools-toolbar>
+    </div>
+  `;
+}
+function defaultView(input, output, target) {
+  function renderState() {
+    switch (input.state) {
+      case "chat-view": {
+        return html13`<devtools-ai-chat-view
+          .props=${input.props}
+          ${Lit10.Directives.ref((el) => {
+          if (!el || !(el instanceof ChatView)) {
+            return;
+          }
+          output.chatView = el;
+        })}
+        ></devtools-ai-chat-view>`;
+      }
+      case "explore-view":
+        return html13`<devtools-widget class="fill-panel" ${widget4(ExploreWidget)}>
+                    </devtools-widget>`;
+      case "disabled-view":
+        return html13`<devtools-widget class="fill-panel" ${widget4(DisabledWidget, input.props)}>
+                    </devtools-widget>`;
+    }
+  }
+  const shouldShowWalkthrough = input.state === "chat-view" && input.props.walkthrough.isExpanded;
+  let walkthroughIsForLastMessage = false;
+  if (input.state === "chat-view") {
+    const lastMessage = input.props.messages.at(-1);
+    if (lastMessage && input.props.walkthrough.activeSidebarMessage?.id === lastMessage.id) {
+      walkthroughIsForLastMessage = true;
+    }
+  }
+  Lit10.render(html13`
+    ${toolbarView(input)}
+    <div class="ai-assistance-view-container">
+      <devtools-split-view
+        name="ai-assistance-split-view-state"
+        direction="column"
+        sidebar-position="second"
+        sidebar-visibility=${shouldShowWalkthrough && !input.props.walkthrough.isInlined ? "visible" : "hidden"}
+        sidebar-initial-size=${WALKTHROUGH_SIDEBAR_INITIAL_WIDTH}
+      >
+        <div slot="main" class="main-view">
+          ${renderState()}
+        </div>
+        ${shouldShowWalkthrough ? html13`
+          <devtools-widget slot="sidebar" ${widget4(WalkthroughView, {
+    message: input.props.walkthrough.activeSidebarMessage,
+    isLoading: input.props.isLoading && walkthroughIsForLastMessage,
+    markdownRenderer: input.props.markdownRenderer,
+    onToggle: input.props.walkthrough.onToggle
+  })}></devtools-widget>` : Lit10.nothing}
+      </devtools-split-view>
+    </div>
+  `, target);
+}
+function createDOMNodeContext(node) {
+  if (!node) {
+    return null;
+  }
+  return new AiAssistanceModel8.DOMNodeContext.DOMNodeContext(node);
+}
+function createFileContext(file) {
+  if (!file) {
+    return null;
+  }
+  return new AiAssistanceModel8.FileContext.FileContext(file);
+}
+function createAccessibilityContext(report) {
+  if (!report) {
+    return null;
+  }
+  return new AiAssistanceModel8.AccessibilityContext.AccessibilityContext(report.report);
+}
+function createRequestContext(request) {
+  if (!request) {
+    return null;
+  }
+  const calculator = NetworkPanel.NetworkPanel.NetworkPanel.instance().networkLogView.timeCalculator();
+  return new AiAssistanceModel8.RequestContext.RequestContext(request, calculator);
+}
+function createPerformanceTraceContext(focus) {
+  if (!focus) {
+    return null;
+  }
+  return new AiAssistanceModel8.PerformanceTraceContext.PerformanceTraceContext(focus);
+}
+function createStorageContext(item) {
+  if (!item) {
+    return null;
+  }
+  return new AiAssistanceModel8.StorageContext.StorageContext(item);
+}
+var panelInstance;
+var AiAssistancePanel = class _AiAssistancePanel extends UI9.Panel.Panel {
+  view;
+  static panelName = "freestyler";
+  // NodeJS debugging does not have Elements panel, thus this action might not exist.
+  #toggleSearchElementAction;
+  #aidaClient;
+  #conversationSummary;
+  #viewOutput = {};
+  #serverSideLoggingEnabled = isAiAssistanceServerSideLoggingEnabled();
+  #aiAssistanceEnabledSetting;
+  #changeManager = new AiAssistanceModel8.ChangeManager.ChangeManager();
+  #mutex = new Common5.Mutex.Mutex();
+  #conversation;
+  #selectedFile = null;
+  #selectedElement = null;
+  #selectedPerformanceTrace = null;
+  #selectedRequest = null;
+  #selectedAccessibility = null;
+  #selectedStorage = null;
+  // Messages displayed in the `ChatView` component.
+  #messages = [];
+  // Whether the UI should show loading or not.
+  #isLoading = false;
+  // Stores the availability status of the `AidaClient` and the reason for unavailability, if any.
+  #aidaAvailability;
+  #timelinePanelInstance = null;
+  #runAbortController = new AbortController();
+  #walkthrough = {
+    isInlined: false,
+    isExpanded: false,
+    activeSidebarMessage: null,
+    inlineExpandedMessages: []
+  };
+  #textInputValue = "";
+  constructor(view = defaultView, { aidaClient, aidaAvailability }) {
+    super(_AiAssistancePanel.panelName);
+    this.view = view;
+    this.registerRequiredCSS(aiAssistancePanel_css_default);
+    this.#aiAssistanceEnabledSetting = this.#getAiAssistanceEnabledSetting();
+    this.#aidaClient = aidaClient;
+    this.#aidaAvailability = aidaAvailability;
+    if (UI9.ActionRegistry.ActionRegistry.instance().hasAction("elements.toggle-element-search")) {
+      this.#toggleSearchElementAction = UI9.ActionRegistry.ActionRegistry.instance().getAction("elements.toggle-element-search");
+    }
+  }
+  #getToolbarInput() {
+    return {
+      isLoading: this.#isLoading,
+      showChatActions: this.#shouldShowChatActions(),
+      showActiveConversationActions: Boolean(this.#conversation && !this.#conversation.isEmpty),
+      onNewChatClick: this.#handleNewChatRequest.bind(this),
+      populateHistoryMenu: this.#populateHistoryMenu.bind(this),
+      onDeleteClick: this.#onDeleteClicked.bind(this),
+      onExportConversationClick: this.#onExportConversationClick.bind(this),
+      onHelpClick: () => {
+        UIHelpers2.openInNewTab(AI_ASSISTANCE_HELP);
+      },
+      onSettingsClick: () => {
+        void UI9.ViewManager.ViewManager.instance().showView("chrome-ai");
+      }
+    };
+  }
+  async #getPanelViewInput() {
+    const blockedByAge = Root4.Runtime.hostConfig.aidaAvailability?.blockedByAge === true;
+    if (this.#aidaAvailability !== "available" || !this.#aiAssistanceEnabledSetting?.getIfNotDisabled() || blockedByAge) {
+      return {
+        state: "disabled-view",
+        props: {
+          aidaAvailability: this.#aidaAvailability
+        }
+      };
+    }
+    if (this.#conversation) {
+      const emptyStateSuggestions = await getEmptyStateSuggestions(this.#conversation);
+      const markdownRenderer = getMarkdownRenderer(this.#conversation);
+      let onContextAdd = null;
+      if (AiAssistanceModel8.AiUtils.isContextSelectionEnabled() && // Only add it the button if can have anything already selected
+      this.#getConversationContext(this.#getDefaultConversationType())) {
+        onContextAdd = this.#handleContextAdd.bind(this);
+      }
+      return {
+        state: "chat-view",
+        props: {
+          blockedByCrossOrigin: this.#conversation.isBlockedByOrigin,
+          isLoading: this.#isLoading,
+          messages: this.#messages,
+          /**
+           * We pass either the selected context with isContextSelected=true
+           * to make sure the pill is show with normal styling and a remove button.
+           * Or we pass the panels default context with isContextSelected=false
+           * to display a placeholder pill with neutral styling and an add button.
+           */
+          context: this.#conversation.selectedContext ?? this.#getConversationContext(this.#getDefaultConversationType()),
+          isContextSelected: Boolean(this.#conversation.selectedContext),
+          conversationType: this.#conversation.type,
+          isReadOnly: this.#conversation.isReadOnly ?? false,
+          inspectElementToggled: this.#toggleSearchElementAction?.toggled() ?? false,
+          canShowFeedbackForm: this.#serverSideLoggingEnabled,
+          multimodalInputEnabled: isAiAssistanceMultimodalInputEnabled() && this.#conversation.type === "freestyler",
+          isTextInputDisabled: this.#isTextInputDisabled(),
+          emptyStateSuggestions,
+          inputPlaceholder: this.#getChatInputPlaceholder(),
+          disclaimerText: this.#getDisclaimerText(),
+          textInputValue: this.#textInputValue,
+          onTextChange: (text) => {
+            this.#textInputValue = text;
+          },
+          onExportConversation: this.#onExportConversationClick.bind(this),
+          uploadImageInputEnabled: isAiAssistanceMultimodalUploadInputEnabled() && this.#conversation.type === "freestyler",
+          markdownRenderer,
+          conversationMarkdown: this.#conversation.getConversationMarkdown(),
+          generateConversationSummary: async (markdown) => {
+            if (!this.#conversationSummary) {
+              this.#conversationSummary = new AiAssistanceModel8.ConversationSummary.ConversationSummary({
+                aidaClient: this.#aidaClient,
+                serverSideLoggingEnabled: this.#serverSideLoggingEnabled
+              });
+            }
+            return await this.#conversationSummary.summarizeConversation(markdown);
+          },
+          onTextSubmit: async (text, imageInput, multimodalInputType) => {
+            const submit = () => {
+              Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceQuerySubmitted);
+              void this.#startConversation(text, imageInput, multimodalInputType);
+            };
+            const seenSetting = Common5.Settings.Settings.instance().resolve(AiAssistanceModel8.AiUtils.aiAssistanceV2OptInChangeDialogSeenSettingDescriptor);
+            if (!seenSetting.get()) {
+              OptInChangeDialog.show({
+                onGotIt: () => {
+                  seenSetting.set(true);
+                  submit();
+                },
+                onManageSettings: () => {
+                  seenSetting.set(true);
+                  this.#viewOutput.chatView?.setInputValue(text);
+                  void UI9.ViewManager.ViewManager.instance().showView("chrome-ai");
+                }
+              });
+              return;
+            }
+            submit();
+          },
+          onInspectElementClick: this.#handleSelectElementClick.bind(this),
+          onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
+          onCancelClick: this.#cancel.bind(this),
+          onContextClick: this.#handleContextClick.bind(this),
+          onNewConversation: this.#handleNewChatRequest.bind(this),
+          onCopyResponseClick: this.#onCopyResponseClick.bind(this),
+          onContextRemoved: AiAssistanceModel8.AiUtils.isContextSelectionEnabled() ? this.#handleContextRemoved.bind(this) : null,
+          onContextAdd,
+          walkthrough: {
+            onToggle: this.#toggleWalkthrough.bind(this),
+            onOpen: this.#openWalkthrough.bind(this),
+            isExpanded: this.#walkthrough.isExpanded,
+            isInlined: this.#walkthrough.isInlined,
+            activeSidebarMessage: this.#walkthrough.activeSidebarMessage,
+            inlineExpandedMessages: this.#walkthrough.inlineExpandedMessages
+          }
+        }
+      };
+    }
+    return {
+      state: "explore-view"
+    };
+  }
+  // Responsive logic for Walkthrough
+  onResize() {
+    super.onResize();
+    this.#updateWalkthroughResponsiveness();
+  }
+  #updateWalkthroughResponsiveness() {
+    const isNarrow = this.contentElement.offsetWidth < WALKTHROUGH_SIDEBAR_BREAKPOINT;
+    if (isNarrow === this.#walkthrough.isInlined) {
+      return;
+    }
+    this.#walkthrough.isInlined = isNarrow;
+    if (!this.#walkthrough.isExpanded) {
+      this.#walkthrough.activeSidebarMessage = null;
+      this.#walkthrough.inlineExpandedMessages = [];
+      this.requestUpdate();
+      return;
+    }
+    if (isNarrow) {
+      this.#walkthrough.inlineExpandedMessages = this.#walkthrough.activeSidebarMessage ? [this.#walkthrough.activeSidebarMessage] : [];
+    } else {
+      this.#walkthrough.activeSidebarMessage = this.#walkthrough.inlineExpandedMessages.at(-1) ?? null;
+    }
+    this.requestUpdate();
+  }
+  #openWalkthrough(message) {
+    if (!this.#walkthrough.inlineExpandedMessages.some((m) => m.id === message.id)) {
+      this.#walkthrough.inlineExpandedMessages.push(message);
+    }
+    this.#walkthrough.activeSidebarMessage = message;
+    this.#walkthrough.isExpanded = true;
+    this.requestUpdate();
+  }
+  /**
+   * Toggles the expanded state of a walkthrough.
+   *
+   * In Wide (sidebar) mode:
+   * - Opening a message's walkthrough shows the sidebar for that message.
+   * - Closing the sidebar hides the walkthrough for the currently active message.
+   *
+   * In Narrow (inline) mode:
+   * - Any number of walkthroughs can be open at once.
+   * - Opening/closing a message's walkthrough only affects that message's inline display.
+   */
+  #toggleWalkthrough(isOpen, message) {
+    if (isOpen) {
+      this.#openWalkthrough(message);
+      return;
+    }
+    this.#walkthrough.inlineExpandedMessages = this.#walkthrough.inlineExpandedMessages.filter((m) => m.id !== message.id);
+    if (this.#walkthrough.isInlined) {
+      this.#walkthrough.isExpanded = this.#walkthrough.inlineExpandedMessages.length > 0;
+      if (this.#walkthrough.activeSidebarMessage?.id === message.id) {
+        this.#walkthrough.activeSidebarMessage = this.#walkthrough.inlineExpandedMessages.at(-1) ?? null;
+      }
+    } else {
+      this.#walkthrough.isExpanded = false;
+      this.#walkthrough.activeSidebarMessage = null;
+    }
+    this.requestUpdate();
+  }
+  #getAiAssistanceEnabledSetting() {
+    return new AiAssistanceModel8.AiSetting.AiSetting(AiAssistanceModel8.AiUtils.aiAssistanceEnabledSettingDescriptor, Host5.AidaClient.HostConfigTracker.instance(), Common5.Settings.Settings.instance());
+  }
+  static async instance(opts = { forceNew: null }) {
+    const { forceNew } = opts;
+    if (!panelInstance || forceNew) {
+      const aidaClient = new Host5.AidaClient.AidaClient();
+      const aidaAvailability = Host5.AidaClient.HostConfigTracker.instance().aidaAvailability ?? await Host5.AidaClient.AidaClient.checkAccessPreconditions();
+      panelInstance = new _AiAssistancePanel(defaultView, { aidaClient, aidaAvailability });
+    }
+    return panelInstance;
+  }
+  /**
+   * Called when the TimelinePanel instance changes. We use this to listen to
+   * the status of if the user is viewing a trace or not, and update the
+   * placeholder text in the panel accordingly. We do this because if the user
+   * has an active trace, we show different text than if they are viewing
+   * the performance panel but have no trace imported.
+   */
+  #bindTimelineTraceListener() {
+    const timelinePanel = UI9.Context.Context.instance().flavor(TimelinePanel2.TimelinePanel.TimelinePanel);
+    if (timelinePanel === this.#timelinePanelInstance) {
+      return;
+    }
+    this.#timelinePanelInstance?.removeEventListener("IsViewingTrace", this.requestUpdate, this);
+    this.#timelinePanelInstance = timelinePanel;
+    if (this.#timelinePanelInstance) {
+      this.#timelinePanelInstance.addEventListener("IsViewingTrace", this.requestUpdate, this);
+    }
+  }
+  async #handlePerformanceRecordAndReload() {
+    return await TimelinePanel2.TimelinePanel.TimelinePanel.executeRecordAndReload();
+  }
+  async #handleLighthouseRun(overrides) {
+    return await LighthousePanel2.LighthousePanel.LighthousePanel.executeLighthouseRecording({
+      isAIControlled: true,
+      ...overrides
+    });
+  }
+  #getDefaultConversationType() {
+    const { hostConfig } = Root4.Runtime;
+    const viewManager = UI9.ViewManager.ViewManager.instance();
+    const isElementsPanelVisible = viewManager.isViewVisible("elements");
+    const isNetworkPanelVisible = viewManager.isViewVisible("network");
+    const isSourcesPanelVisible = viewManager.isViewVisible("sources");
+    const isPerformancePanelVisible = viewManager.isViewVisible("timeline");
+    const isLighthousePanelVisible = viewManager.isViewVisible("lighthouse");
+    const isApplicationPanelVisible = viewManager.isViewVisible("resources");
+    let targetConversationType;
+    if (isElementsPanelVisible && hostConfig.devToolsFreestyler?.enabled) {
+      targetConversationType = "freestyler";
+    } else if (isNetworkPanelVisible && hostConfig.devToolsAiAssistanceNetworkAgent?.enabled) {
+      targetConversationType = "drjones-network-request";
+    } else if (isSourcesPanelVisible && hostConfig.devToolsAiAssistanceFileAgent?.enabled) {
+      targetConversationType = "drjones-file";
+    } else if (isPerformancePanelVisible && hostConfig.devToolsAiAssistancePerformanceAgent?.enabled) {
+      targetConversationType = "drjones-performance-full";
+    } else if (isLighthousePanelVisible && hostConfig.devToolsAiAssistanceAccessibilityAgent?.enabled) {
+      targetConversationType = "accessibility";
+    } else if (isApplicationPanelVisible && hostConfig.devToolsAiAssistanceStorageAgent?.enabled) {
+      targetConversationType = "storage";
+    }
+    if (AiAssistanceModel8.AiUtils.isContextSelectionEnabled() && !targetConversationType) {
+      return "none";
+    }
+    return targetConversationType;
+  }
+  // We select the default agent based on the open panels if
+  // there isn't any active conversation.
+  #selectDefaultAgentIfNeeded() {
+    if (this.#isLoading) {
+      this.requestUpdate();
+      return;
+    }
+    if (this.#conversation && !this.#conversation.isEmpty) {
+      this.requestUpdate();
+      return;
+    }
+    const targetConversationType = this.#getDefaultConversationType();
+    if (this.#conversation?.type === targetConversationType) {
+      this.requestUpdate();
+      return;
+    }
+    const conversation = targetConversationType ? new AiAssistanceModel8.AiConversation.AiConversation({
+      type: targetConversationType,
+      data: [],
+      isReadOnly: false,
+      aidaClient: this.#aidaClient,
+      changeManager: this.#changeManager,
+      performanceRecordAndReload: this.#handlePerformanceRecordAndReload.bind(this),
+      onInspectElement: this.#handleInspectElement.bind(this),
+      networkTimeCalculator: NetworkPanel.NetworkPanel.NetworkPanel.instance().networkLogView.timeCalculator(),
+      lighthouseRecording: this.#handleLighthouseRun.bind(this)
+    }) : void 0;
+    this.#updateConversationState(conversation);
+  }
+  #updateConversationState(conversation) {
+    if (this.#conversation !== conversation) {
+      this.#cancel();
+      this.#messages = [];
+      this.#isLoading = false;
+      this.#conversation?.archiveConversation();
+      if (!conversation) {
+        const conversationType = this.#getDefaultConversationType();
+        if (conversationType) {
+          conversation = new AiAssistanceModel8.AiConversation.AiConversation({
+            type: conversationType,
+            data: [],
+            isReadOnly: false,
+            aidaClient: this.#aidaClient,
+            changeManager: this.#changeManager,
+            performanceRecordAndReload: this.#handlePerformanceRecordAndReload.bind(this),
+            onInspectElement: this.#handleInspectElement.bind(this),
+            networkTimeCalculator: NetworkPanel.NetworkPanel.NetworkPanel.instance().networkLogView.timeCalculator(),
+            lighthouseRecording: this.#handleLighthouseRun.bind(this)
+          });
+        }
+      }
+      this.#conversation = conversation;
+    }
+    if (this.#conversation) {
+      if (this.#conversation.isEmpty && AiAssistanceModel8.AiUtils.isContextSelectionEnabled()) {
+        const context = this.#getConversationContext(this.#getDefaultConversationType());
+        this.#conversation.setContext(context);
+      } else {
+        const context = this.#getConversationContext(this.#conversation.type);
+        if (context || !AiAssistanceModel8.AiUtils.isContextSelectionEnabled()) {
+          this.#conversation.setContext(context);
+        }
+      }
+    }
+    this.requestUpdate();
+  }
+  wasShown() {
+    super.wasShown();
+    this.#viewOutput.chatView?.restoreScrollPosition();
+    this.#viewOutput.chatView?.focusTextInput();
+    this.#selectedElement = createDOMNodeContext(selectedElementFilter(UI9.Context.Context.instance().flavor(SDK6.DOMModel.DOMNode)));
+    this.#selectedRequest = createRequestContext(UI9.Context.Context.instance().flavor(SDK6.NetworkRequest.NetworkRequest));
+    this.#selectedPerformanceTrace = createPerformanceTraceContext(UI9.Context.Context.instance().flavor(AiAssistanceModel8.AIContext.AgentFocus));
+    this.#selectedFile = createFileContext(UI9.Context.Context.instance().flavor(Workspace4.UISourceCode.UISourceCode));
+    this.#selectedAccessibility = createAccessibilityContext(UI9.Context.Context.instance().flavor(LighthousePanel2.LighthousePanel.ActiveLighthouseReport));
+    this.#selectedStorage = createStorageContext(UI9.Context.Context.instance().flavor(AiAssistanceModel8.StorageItem.StorageItem));
+    this.#updateConversationState(this.#conversation);
+    AiAssistanceModel8.AiHistoryStorage.AiHistoryStorage.instance().addEventListener("AiHistoryDeleted", this.#onHistoryDeleted, this);
+    this.#aiAssistanceEnabledSetting.addEventListener("Changed", this.requestUpdate, this);
+    Host5.AidaClient.HostConfigTracker.instance().addEventListener("aidaAvailabilityChanged", this.#handleAidaAvailabilityChange);
+    const initialAvailability = Host5.AidaClient.HostConfigTracker.instance().aidaAvailability;
+    if (initialAvailability !== void 0) {
+      this.#updateAidaAvailability(initialAvailability);
+    }
+    this.#toggleSearchElementAction?.addEventListener("Toggled", this.requestUpdate, this);
+    UI9.Context.Context.instance().addFlavorChangeListener(SDK6.DOMModel.DOMNode, this.#handleDOMNodeFlavorChange);
+    UI9.Context.Context.instance().addFlavorChangeListener(SDK6.NetworkRequest.NetworkRequest, this.#handleNetworkRequestFlavorChange);
+    UI9.Context.Context.instance().addFlavorChangeListener(AiAssistanceModel8.AIContext.AgentFocus, this.#handlePerformanceTraceFlavorChange);
+    UI9.Context.Context.instance().addFlavorChangeListener(AiAssistanceModel8.StorageItem.StorageItem, this.#handleStorageItemFlavorChange);
+    UI9.Context.Context.instance().addFlavorChangeListener(Workspace4.UISourceCode.UISourceCode, this.#handleUISourceCodeFlavorChange);
+    UI9.Context.Context.instance().addFlavorChangeListener(LighthousePanel2.LighthousePanel.ActiveLighthouseReport, this.#handleLighthouseReportFlavorChange);
+    UI9.ViewManager.ViewManager.instance().addEventListener("ViewVisibilityChanged", this.#selectDefaultAgentIfNeeded, this);
+    SDK6.TargetManager.TargetManager.instance().addModelListener(SDK6.DOMModel.DOMModel, SDK6.DOMModel.Events.AttrModified, this.#handleDOMNodeAttrChange, this);
+    SDK6.TargetManager.TargetManager.instance().addModelListener(SDK6.DOMModel.DOMModel, SDK6.DOMModel.Events.AttrRemoved, this.#handleDOMNodeAttrChange, this);
+    UI9.Context.Context.instance().addFlavorChangeListener(TimelinePanel2.TimelinePanel.TimelinePanel, this.#bindTimelineTraceListener, this);
+    this.#bindTimelineTraceListener();
+    this.#selectDefaultAgentIfNeeded();
+    Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistancePanelOpened);
+  }
+  willHide() {
+    super.willHide();
+    AiAssistanceModel8.AiHistoryStorage.AiHistoryStorage.instance().removeEventListener("AiHistoryDeleted", this.#onHistoryDeleted, this);
+    this.#aiAssistanceEnabledSetting.removeEventListener("Changed", this.requestUpdate, this);
+    Host5.AidaClient.HostConfigTracker.instance().removeEventListener("aidaAvailabilityChanged", this.#handleAidaAvailabilityChange);
+    this.#toggleSearchElementAction?.removeEventListener("Toggled", this.requestUpdate, this);
+    UI9.Context.Context.instance().removeFlavorChangeListener(SDK6.DOMModel.DOMNode, this.#handleDOMNodeFlavorChange);
+    UI9.Context.Context.instance().removeFlavorChangeListener(SDK6.NetworkRequest.NetworkRequest, this.#handleNetworkRequestFlavorChange);
+    UI9.Context.Context.instance().removeFlavorChangeListener(AiAssistanceModel8.AIContext.AgentFocus, this.#handlePerformanceTraceFlavorChange);
+    UI9.Context.Context.instance().removeFlavorChangeListener(AiAssistanceModel8.StorageItem.StorageItem, this.#handleStorageItemFlavorChange);
+    UI9.Context.Context.instance().removeFlavorChangeListener(Workspace4.UISourceCode.UISourceCode, this.#handleUISourceCodeFlavorChange);
+    UI9.Context.Context.instance().removeFlavorChangeListener(LighthousePanel2.LighthousePanel.ActiveLighthouseReport, this.#handleLighthouseReportFlavorChange);
+    UI9.ViewManager.ViewManager.instance().removeEventListener("ViewVisibilityChanged", this.#selectDefaultAgentIfNeeded, this);
+    UI9.Context.Context.instance().removeFlavorChangeListener(TimelinePanel2.TimelinePanel.TimelinePanel, this.#bindTimelineTraceListener, this);
+    SDK6.TargetManager.TargetManager.instance().removeModelListener(SDK6.DOMModel.DOMModel, SDK6.DOMModel.Events.AttrModified, this.#handleDOMNodeAttrChange, this);
+    SDK6.TargetManager.TargetManager.instance().removeModelListener(SDK6.DOMModel.DOMModel, SDK6.DOMModel.Events.AttrRemoved, this.#handleDOMNodeAttrChange, this);
+    if (this.#timelinePanelInstance) {
+      this.#timelinePanelInstance.removeEventListener("IsViewingTrace", this.requestUpdate, this);
+      this.#timelinePanelInstance = null;
+    }
+  }
+  #updateAidaAvailability(aidaAvailability) {
+    if (aidaAvailability !== this.#aidaAvailability) {
+      this.#aidaAvailability = aidaAvailability;
+      this.requestUpdate();
+    }
+  }
+  #handleAidaAvailabilityChange = (ev) => {
+    this.#updateAidaAvailability(ev.data);
+  };
+  #handleDOMNodeFlavorChange = (ev) => {
+    if (this.#selectedElement?.getItem() === ev.data) {
+      return;
+    }
+    this.#selectedElement = createDOMNodeContext(selectedElementFilter(ev.data));
+    this.#updateConversationState(this.#conversation);
+  };
+  #handleStorageItemFlavorChange = (ev) => {
+    if (this.#selectedStorage?.getItem() === ev.data) {
+      return;
+    }
+    this.#selectedStorage = createStorageContext(ev.data);
+    this.#updateConversationState(this.#conversation);
+  };
+  #handleDOMNodeAttrChange = (ev) => {
+    if (this.#selectedElement?.getItem() === ev.data.node) {
+      if (ev.data.name === "class" || ev.data.name === "id") {
+        this.requestUpdate();
+      }
+    }
+  };
+  #handleNetworkRequestFlavorChange = (ev) => {
+    if (this.#selectedRequest?.getItem() === ev.data) {
+      return;
+    }
+    if (ev.data) {
+      const calculator = NetworkPanel.NetworkPanel.NetworkPanel.instance().networkLogView.timeCalculator();
+      this.#selectedRequest = new AiAssistanceModel8.RequestContext.RequestContext(ev.data, calculator);
+    } else {
+      this.#selectedRequest = null;
+    }
+    this.#updateConversationState(this.#conversation);
+  };
+  #handlePerformanceTraceFlavorChange = (ev) => {
+    if (this.#selectedPerformanceTrace?.getItem() === ev.data) {
+      return;
+    }
+    this.#selectedPerformanceTrace = Boolean(ev.data) ? new AiAssistanceModel8.PerformanceTraceContext.PerformanceTraceContext(ev.data) : null;
+    this.#updateConversationState(this.#conversation);
+  };
+  #handleUISourceCodeFlavorChange = (ev) => {
+    const newFile = ev.data;
+    if (!newFile || this.#selectedFile?.getItem() === newFile) {
+      return;
+    }
+    this.#selectedFile = new AiAssistanceModel8.FileContext.FileContext(ev.data);
+    this.#updateConversationState(this.#conversation);
+  };
+  #handleLighthouseReportFlavorChange = (ev) => {
+    const newReport = ev.data;
+    if (this.#selectedAccessibility?.getItem() === newReport?.report) {
+      return;
+    }
+    this.#selectedAccessibility = createAccessibilityContext(newReport);
+    this.#updateConversationState(this.#conversation);
+  };
+  async performUpdate() {
+    const viewInput = {
+      ...this.#getToolbarInput(),
+      ...await this.#getPanelViewInput()
+    };
+    this.view(viewInput, this.#viewOutput, this.contentElement);
+  }
+  #onCopyResponseClick(message) {
+    const markdown = getResponseMarkdown(message);
+    if (markdown) {
+      Host5.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(markdown);
+      Snackbars4.Snackbar.Snackbar.show({
+        message: i18nString6(UIStrings6.responseCopiedToClipboard)
+      });
+    }
+  }
+  #handleSelectElementClick() {
+    UI9.Context.Context.instance().setFlavor(Common5.ReturnToPanel.ReturnToPanelFlavor, new Common5.ReturnToPanel.ReturnToPanelFlavor(this.panelName));
+    void this.#toggleSearchElementAction?.execute();
+  }
+  #isTextInputDisabled() {
+    if (this.#conversation && this.#conversation.isBlockedByOrigin) {
+      return true;
+    }
+    if (!this.#conversation) {
+      return true;
+    }
+    if (!this.#conversation.selectedContext && !AiAssistanceModel8.AiUtils.isContextSelectionEnabled()) {
+      return true;
+    }
+    return false;
+  }
+  #shouldShowChatActions() {
+    const aiAssistanceSetting = this.#aiAssistanceEnabledSetting?.getIfNotDisabled();
+    const isBlockedByAge = Root4.Runtime.hostConfig.aidaAvailability?.blockedByAge === true;
+    if (!aiAssistanceSetting || isBlockedByAge) {
+      return false;
+    }
+    if (this.#aidaAvailability === "no-account-email" || this.#aidaAvailability === "sync-is-paused") {
+      return false;
+    }
+    return true;
+  }
+  #getChatInputPlaceholder() {
+    if (!this.#conversation) {
+      return i18nString6(UIStrings6.followTheSteps);
+    }
+    if (this.#conversation && this.#conversation.isBlockedByOrigin) {
+      return lockedString6(UIStringsNotTranslate5.crossOriginError);
+    }
+    if (Root4.Runtime.hostConfig.devToolsAiV2Architecture?.enabled) {
+      return lockedString6(UIStringsNotTranslate5.inputPlaceholderForV2);
+    }
+    switch (this.#conversation.type) {
+      case "freestyler":
+        return this.#conversation.selectedContext ? lockedString6(UIStringsNotTranslate5.inputPlaceholderForStyling) : lockedString6(UIStringsNotTranslate5.inputPlaceholderForStylingNoContext);
+      case "drjones-file":
+        return this.#conversation.selectedContext ? lockedString6(UIStringsNotTranslate5.inputPlaceholderForFile) : lockedString6(UIStringsNotTranslate5.inputPlaceholderForFileNoContext);
+      case "drjones-network-request":
+        return this.#conversation.selectedContext ? lockedString6(UIStringsNotTranslate5.inputPlaceholderForNetwork) : lockedString6(UIStringsNotTranslate5.inputPlaceholderForNetworkNoContext);
+      case "drjones-performance-full": {
+        const perfPanel = UI9.Context.Context.instance().flavor(TimelinePanel2.TimelinePanel.TimelinePanel);
+        if (perfPanel?.hasActiveTrace()) {
+          return this.#conversation.selectedContext ? lockedString6(UIStringsNotTranslate5.inputPlaceholderForPerformanceTrace) : lockedString6(UIStringsNotTranslate5.inputPlaceholderForPerformanceTraceNoContext);
+        }
+        return lockedString6(UIStringsNotTranslate5.inputPlaceholderForPerformanceWithNoRecording);
+      }
+      case "accessibility":
+        return this.#conversation.selectedContext ? lockedString6(UIStringsNotTranslate5.inputPlaceholderForAccessibility) : lockedString6(UIStringsNotTranslate5.inputPlaceholderForAccessibilityNoContext);
+      case "storage":
+        return lockedString6(UIStringsNotTranslate5.inputPlaceholderForNoContext);
+      case "none":
+        if (AiAssistanceModel8.AiUtils.isGeminiBranding()) {
+          return lockedString6(UIStringsNotTranslate5.inputPlaceholderForNoContextBranded);
+        }
+        return lockedString6(UIStringsNotTranslate5.inputPlaceholderForNoContext);
+    }
+  }
+  #getDisclaimerText() {
+    if (!this.#conversation || this.#conversation.isReadOnly) {
+      return i18nString6(UIStrings6.inputDisclaimerForEmptyState);
+    }
+    const loggingEnabled = Root4.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue !== Root4.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
+    if (loggingEnabled) {
+      return lockedString6(UIStringsNotTranslate5.inputDisclaimer);
+    }
+    return lockedString6(UIStringsNotTranslate5.inputDisclaimerEnterpriseNoLogging);
+  }
+  #handleFeedbackSubmit(rpcId, rating, feedback) {
+    void this.#aidaClient.registerClientEvent({
+      corresponding_aida_rpc_global_id: rpcId,
+      disable_user_content_logging: !this.#serverSideLoggingEnabled,
+      do_conversation_client_event: {
+        user_feedback: {
+          sentiment: rating,
+          user_input: {
+            comment: feedback
+          }
+        }
+      }
+    });
+  }
+  #handleContextClick() {
+    if (!this.#conversation) {
+      return;
+    }
+    const context = this.#conversation.selectedContext;
+    if (context instanceof AiAssistanceModel8.RequestContext.RequestContext) {
+      const requestLocation = NetworkForward2.UIRequestLocation.UIRequestLocation.tab(
+        context.getItem(),
+        "headers-component"
+        /* NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT */
+      );
+      return Common5.Revealer.reveal(requestLocation);
+    }
+    if (context instanceof AiAssistanceModel8.FileContext.FileContext) {
+      return Common5.Revealer.reveal(context.getItem().uiLocation(0, 0));
+    }
+    if (context instanceof AiAssistanceModel8.PerformanceTraceContext.PerformanceTraceContext) {
+      const focus = context.getItem();
+      if (focus.callTree) {
+        const event = focus.callTree.selectedNode?.event ?? focus.callTree.rootNode.event;
+        const revealable = new SDK6.TraceObject.RevealableEvent(event);
+        return Common5.Revealer.reveal(revealable);
+      }
+      if (focus.insight) {
+        return Common5.Revealer.reveal(focus.insight);
+      }
+    }
+  }
+  #handleContextRemoved() {
+    this.#conversation?.setContext(null);
+    this.requestUpdate();
+  }
+  #handleContextAdd() {
+    this.#conversation?.setContext(this.#getConversationContext(this.#getDefaultConversationType()));
+    this.requestUpdate();
+  }
+  #canExecuteQuery() {
+    const isBrandedBuild = Boolean(Root4.Runtime.hostConfig.aidaAvailability?.enabled);
+    const isBlockedByAge = Boolean(Root4.Runtime.hostConfig.aidaAvailability?.blockedByAge);
+    const isAidaAvailable = Boolean(
+      this.#aidaAvailability === "available"
+      /* Host.AidaClient.AidaAccessPreconditions.AVAILABLE */
+    );
+    const isUserOptedIn = Boolean(this.#aiAssistanceEnabledSetting?.getIfNotDisabled());
+    return isBrandedBuild && isAidaAvailable && isUserOptedIn && !isBlockedByAge;
+  }
+  async handleAction(actionId, opts) {
+    if (this.#isLoading && !opts?.["prompt"]) {
+      this.#viewOutput.chatView?.focusTextInput();
+      return;
+    }
+    let targetConversationType;
+    switch (actionId) {
+      case "freestyler.elements-floating-button": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromElementsPanelFloatingButton);
+        targetConversationType = "freestyler";
+        break;
+      }
+      case "freestyler.element-panel-context": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromElementsPanel);
+        targetConversationType = "freestyler";
+        break;
+      }
+      case "drjones.network-floating-button": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromNetworkPanelFloatingButton);
+        targetConversationType = "drjones-network-request";
+        break;
+      }
+      case "drjones.network-panel-context": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromNetworkPanel);
+        targetConversationType = "drjones-network-request";
+        break;
+      }
+      case "drjones.performance-panel-context": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromPerformancePanelCallTree);
+        targetConversationType = "drjones-performance-full";
+        break;
+      }
+      case "drjones.sources-floating-button": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromSourcesPanelFloatingButton);
+        targetConversationType = "drjones-file";
+        break;
+      }
+      case "drjones.sources-panel-context": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromSourcesPanel);
+        targetConversationType = "drjones-file";
+        break;
+      }
+      case "ai-assistance.storage-floating-button": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromApplicationPanelFloatingButton);
+        targetConversationType = "storage";
+        break;
+      }
+      case "ai-assistance.application-panel-context": {
+        Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceOpenedFromApplicationPanel);
+        targetConversationType = "storage";
+        break;
+      }
+    }
+    if (!targetConversationType) {
+      return;
+    }
+    let conversation = this.#conversation;
+    if (!this.#conversation || this.#conversation.type !== targetConversationType || this.#conversation.isEmpty) {
+      conversation = new AiAssistanceModel8.AiConversation.AiConversation({
+        type: targetConversationType,
+        data: [],
+        isReadOnly: false,
+        aidaClient: this.#aidaClient,
+        changeManager: this.#changeManager,
+        performanceRecordAndReload: this.#handlePerformanceRecordAndReload.bind(this),
+        onInspectElement: this.#handleInspectElement.bind(this),
+        networkTimeCalculator: NetworkPanel.NetworkPanel.NetworkPanel.instance().networkLogView.timeCalculator(),
+        lighthouseRecording: this.#handleLighthouseRun.bind(this)
+      });
+    }
+    this.#updateConversationState(conversation);
+    const predefinedPrompt = opts?.["prompt"];
+    if (predefinedPrompt && typeof predefinedPrompt === "string") {
+      if (!this.#canExecuteQuery()) {
+        return;
+      }
+      Host5.userMetrics.actionTaken(Host5.UserMetrics.Action.AiAssistanceQuerySubmitted);
+      if (this.#conversation && this.#conversation.isBlockedByOrigin) {
+        this.#handleNewChatRequest();
+      }
+      await this.#startConversation(predefinedPrompt);
+    } else {
+      this.#viewOutput.chatView?.focusTextInput();
+    }
+  }
+  #populateHistoryMenu(contextMenu) {
+    const history = AiAssistanceModel8.AiHistoryStorage.AiHistoryStorage.instance().getHistory();
+    const activeId = this.#conversation?.id;
+    for (const serialized of [...history].reverse()) {
+      const isConversationEmpty = serialized.history.length === 0;
+      if (isConversationEmpty) {
+        continue;
+      }
+      const title = AiAssistanceModel8.AiConversation.AiConversation.titleForSerialized(serialized);
+      if (!title) {
+        continue;
+      }
+      contextMenu.defaultSection().appendCheckboxItem(title, () => {
+        const conversation = AiAssistanceModel8.AiConversation.AiConversation.fromSerializedConversation(serialized);
+        void this.#openHistoricConversation(conversation);
+      }, { checked: activeId === serialized.id, jslogContext: "freestyler.history-item" });
+    }
+    const historyEmpty = contextMenu.defaultSection().items.length === 0;
+    if (historyEmpty) {
+      contextMenu.defaultSection().appendItem(i18nString6(UIStrings6.noPastConversations), () => {
+      }, {
+        disabled: true
+      });
+    }
+    contextMenu.footerSection().appendItem(i18nString6(UIStrings6.clearChatHistory), () => {
+      void AiAssistanceModel8.AiHistoryStorage.AiHistoryStorage.instance().deleteAll();
+    }, {
+      disabled: historyEmpty
+    });
+  }
+  #onHistoryDeleted() {
+    this.#updateConversationState();
+  }
+  #resetWalkthrough() {
+    this.#walkthrough.isExpanded = false;
+    this.#walkthrough.activeSidebarMessage = null;
+    this.#walkthrough.inlineExpandedMessages = [];
+  }
+  #onDeleteClicked() {
+    if (!this.#conversation) {
+      return;
+    }
+    this.#resetWalkthrough();
+    void AiAssistanceModel8.AiHistoryStorage.AiHistoryStorage.instance().deleteHistoryEntry(this.#conversation.id);
+    this.#updateConversationState();
+    UI9.ARIAUtils.LiveAnnouncer.alert(i18nString6(UIStrings6.chatDeleted));
+  }
+  async #onExportConversationClick() {
+    if (!this.#conversation) {
+      return;
+    }
+    return await saveToDisk(this.#conversation);
+  }
+  async #openHistoricConversation(conversation) {
+    if (this.#conversation?.id === conversation.id) {
+      return;
+    }
+    this.#updateConversationState(conversation);
+    await this.#doConversation(conversation.history);
+  }
+  #handleNewChatRequest() {
+    this.#textInputValue = "";
+    this.#updateConversationState();
+    this.#resetWalkthrough();
+    UI9.ARIAUtils.LiveAnnouncer.alert(i18nString6(UIStrings6.newChatCreated));
+  }
+  #cancel() {
+    this.#runAbortController.abort();
+    this.#runAbortController = new AbortController();
+  }
+  #getConversationContext(type) {
+    switch (type) {
+      case "freestyler":
+        return this.#selectedElement;
+      case "drjones-file":
+        return this.#selectedFile;
+      case "drjones-network-request":
+        return this.#selectedRequest;
+      case "drjones-performance-full":
+        return this.#selectedPerformanceTrace;
+      case "accessibility":
+        return this.#selectedAccessibility;
+      case "storage":
+        return this.#selectedStorage;
+      case "none":
+      case void 0:
+        return null;
+    }
+  }
+  #handleConversationContextChange = (data) => {
+    if (data instanceof AiAssistanceModel8.FileContext.FileContext) {
+      this.#selectedFile = data;
+    } else if (data instanceof AiAssistanceModel8.DOMNodeContext.DOMNodeContext) {
+      this.#selectedElement = data;
+    } else if (data instanceof AiAssistanceModel8.RequestContext.RequestContext) {
+      this.#selectedRequest = data;
+    } else if (data instanceof AiAssistanceModel8.PerformanceTraceContext.PerformanceTraceContext) {
+      this.#selectedPerformanceTrace = data;
+    } else if (data instanceof AiAssistanceModel8.AccessibilityContext.AccessibilityContext) {
+      this.#selectedAccessibility = data;
+    } else if (data instanceof AiAssistanceModel8.StorageContext.StorageContext) {
+      this.#selectedStorage = data;
+    }
+    void VisualLogging8.logFunctionCall(`context-change-${this.#conversation?.type}`);
+    this.requestUpdate();
+  };
+  async #handleInspectElement() {
+    if (!this.#toggleSearchElementAction) {
+      return null;
+    }
+    const result = new Promise((resolve) => {
+      const handleDOMNodeFlavorChange = (ev) => {
+        if (!ev.data) {
+          return;
+        }
+        resolve(selectedElementFilter(ev.data));
+        removeListeners();
+      };
+      const handleInspectModeToggled = (ev) => {
+        if (!ev.data) {
+          window.setTimeout(() => {
+            resolve(selectedElementFilter(UI9.Context.Context.instance().flavor(SDK6.DOMModel.DOMNode)));
+            removeListeners();
+          }, 50);
+        }
+      };
+      const handleAbort = () => {
+        resolve(null);
+        removeListeners();
+      };
+      const removeListeners = () => {
+        UI9.Context.Context.instance().removeFlavorChangeListener(SDK6.DOMModel.DOMNode, handleDOMNodeFlavorChange);
+        this.#toggleSearchElementAction?.removeEventListener("Toggled", handleInspectModeToggled);
+        this.#runAbortController.signal.removeEventListener("abort", handleAbort);
+      };
+      UI9.Context.Context.instance().addFlavorChangeListener(SDK6.DOMModel.DOMNode, handleDOMNodeFlavorChange);
+      this.#toggleSearchElementAction?.addEventListener("Toggled", handleInspectModeToggled);
+      this.#runAbortController.signal.addEventListener("abort", handleAbort, { once: true });
+    });
+    void this.#toggleSearchElementAction.execute();
+    try {
+      return await result;
+    } finally {
+      if (this.#toggleSearchElementAction.toggled()) {
+        void this.#toggleSearchElementAction.execute();
+      }
+    }
+  }
+  async #startConversation(text, imageInput, multimodalInputType) {
+    if (!this.#conversation) {
+      return;
+    }
+    this.#cancel();
+    const signal = this.#runAbortController.signal;
+    if (this.#conversation.isEmpty) {
+      Badges.UserBadges.instance().recordAction(Badges.BadgeAction.STARTED_AI_CONVERSATION);
+    }
+    let multimodalInput;
+    if (isAiAssistanceMultimodalInputEnabled() && imageInput && multimodalInputType) {
+      multimodalInput = {
+        input: imageInput,
+        id: crypto.randomUUID(),
+        type: multimodalInputType
+      };
+    }
+    void VisualLogging8.logFunctionCall(`start-conversation-${this.#conversation.type}`, "ui");
+    await this.#doConversation(this.#conversation.run(text, {
+      signal,
+      multimodalInput
+    }));
+  }
+  async #doConversation(items) {
+    const release = await this.#mutex.acquire();
+    try {
+      let commitStep = function() {
+        const lastPart = systemMessage.parts.at(-1);
+        if (lastPart?.type === "step" && lastPart.step === step) {
+          return;
+        }
+        systemMessage.parts.push({
+          type: "step",
+          step
+        });
+      };
+      let systemMessage = {
+        entity: "model",
+        parts: [],
+        id: crypto.randomUUID()
+      };
+      let step = { state: { type: "in_progress" } };
+      this.#isLoading = true;
+      let announcedAnswerLoading = false;
+      let announcedAnswerReady = false;
+      for await (const data of items) {
+        switch (data.type) {
+          case "user-query": {
+            this.#messages.push({
+              entity: "user",
+              text: data.query,
+              imageInput: data.imageInput,
+              id: crypto.randomUUID()
+            });
+            systemMessage = {
+              entity: "model",
+              parts: [],
+              id: crypto.randomUUID()
+            };
+            this.#messages.push(systemMessage);
+            const isSidebarWalkthroughOpen = this.#walkthrough.isExpanded && !this.#walkthrough.isInlined;
+            if (isSidebarWalkthroughOpen) {
+              this.#openWalkthrough(systemMessage);
+            }
+            break;
+          }
+          case "querying": {
+            step = { state: { type: "in_progress" } };
+            if (!systemMessage.parts.length) {
+              commitStep();
+            }
+            break;
+          }
+          case "context": {
+            step.title = lockedString6(UIStringsNotTranslate5.analyzingData);
+            step.contextDetails = data.details;
+            step.widgets = data.widgets;
+            step.state = { type: "completed" };
+            commitStep();
+            break;
+          }
+          case "title": {
+            step.title = data.title;
+            commitStep();
+            break;
+          }
+          case "thought": {
+            step.state = { type: "completed" };
+            step.thought = data.thought;
+            commitStep();
+            break;
+          }
+          case "suggestions": {
+            const lastPart = systemMessage.parts.at(-1);
+            if (lastPart?.type === "answer") {
+              lastPart.suggestions = data.suggestions;
+            } else {
+              systemMessage.parts.push({
+                type: "answer",
+                text: "",
+                suggestions: data.suggestions
+              });
+            }
+            break;
+          }
+          case "side-effect": {
+            step.code ??= data.code;
+            step.state = {
+              type: "needs_approval",
+              sideEffectDialog: {
+                description: data.description,
+                onAnswer: (result) => {
+                  data.confirm(result);
+                  step.state = { type: "completed" };
+                  this.requestUpdate();
+                }
+              }
+            };
+            commitStep();
+            break;
+          }
+          case "action": {
+            step.state = data.canceled ? { type: "canceled" } : { type: "completed" };
+            step.code ??= data.code;
+            step.output ??= data.output;
+            step.widgets ??= data.widgets;
+            commitStep();
+            break;
+          }
+          case "answer": {
+            systemMessage.rpcId = data.rpcId;
+            const lastPart = systemMessage.parts.at(-1);
+            if (lastPart?.type === "answer") {
+              lastPart.text = data.text;
+              if (data.suggestions) {
+                lastPart.suggestions = data.suggestions;
+              }
+            } else {
+              const newPart = {
+                type: "answer",
+                text: data.text
+              };
+              if (data.suggestions) {
+                newPart.suggestions = data.suggestions;
+              }
+              systemMessage.parts.push(newPart);
+            }
+            if (data.widgets) {
+              systemMessage.parts.push({
+                type: "widget",
+                widgets: data.widgets
+              });
+            }
+            if (systemMessage.parts.length > 1) {
+              const firstPart = systemMessage.parts[0];
+              if (firstPart.type === "step" && firstPart.step.state.type === "in_progress" && !firstPart.step.thought && !firstPart.step.code && !firstPart.step.contextDetails) {
+                systemMessage.parts.shift();
+              }
+            }
+            step.state = { type: "completed" };
+            break;
+          }
+          case "error": {
+            systemMessage.error = data.error;
+            const lastPart = systemMessage.parts.at(-1);
+            if (lastPart?.type === "step") {
+              const lastStep = lastPart.step;
+              if (data.error === "abort") {
+                lastStep.state = { type: "canceled" };
+              } else if (lastStep.state.type === "in_progress") {
+                systemMessage.parts.pop();
+              }
+            }
+            if (data.error === "block") {
+              const lastPart2 = systemMessage.parts.at(-1);
+              if (lastPart2?.type === "answer") {
+                systemMessage.parts.pop();
+              }
+            }
+            break;
+          }
+          case "context-change": {
+            this.#handleConversationContextChange(data.context);
+            step.state = { type: "completed" };
+            step.widgets = data.widgets;
+            commitStep();
+            step = { state: { type: "in_progress" } };
+            break;
+          }
+        }
+        if (!this.#conversation?.isReadOnly) {
+          this.requestUpdate();
+          if (data.type === "context" || data.type === "side-effect") {
+            this.#viewOutput.chatView?.scrollToBottom();
+          }
+          switch (data.type) {
+            case "context":
+              UI9.ARIAUtils.LiveAnnouncer.status(lockedString6(UIStringsNotTranslate5.analyzingData));
+              break;
+            case "answer": {
+              if (!data.complete && !announcedAnswerLoading) {
+                announcedAnswerLoading = true;
+                UI9.ARIAUtils.LiveAnnouncer.status(lockedString6(UIStringsNotTranslate5.answerLoading));
+              } else if (data.complete && !announcedAnswerReady) {
+                announcedAnswerReady = true;
+                UI9.ARIAUtils.LiveAnnouncer.status(lockedString6(UIStringsNotTranslate5.answerReady));
+              }
+            }
+          }
+        }
+      }
+      this.#isLoading = false;
+      this.requestUpdate();
+    } finally {
+      release();
+    }
+  }
+};
+function getResponseMarkdown(message) {
+  const contentParts = ["## AI"];
+  for (const part of message.parts) {
+    if (part.type === "answer") {
+      contentParts.push(`### Answer
+
+${part.text}`);
+    } else if (part.type === "step") {
+      const step = part.step;
+      if (step.title) {
+        contentParts.push(`### ${step.title}`);
+      }
+      if (step.contextDetails) {
+        contentParts.push(AiAssistanceModel8.AiConversation.generateContextDetailsMarkdown(step.contextDetails));
+      }
+      if (step.thought) {
+        contentParts.push(step.thought);
+      }
+      if (step.code) {
+        contentParts.push(`**Code executed:**
+\`\`\`
+${step.code.trim()}
+\`\`\``);
+      }
+      if (step.output) {
+        contentParts.push(`**Data returned:**
+\`\`\`
+${step.output}
+\`\`\``);
+      }
+    }
+  }
+  return contentParts.join("\n\n");
+}
+var ActionDelegate = class {
+  handleAction(_context, actionId, opts) {
+    switch (actionId) {
+      case "freestyler.elements-floating-button":
+      case "freestyler.element-panel-context":
+      case "freestyler.main-menu":
+      case "drjones.network-floating-button":
+      case "drjones.network-panel-context":
+      case "drjones.performance-panel-context":
+      case "drjones.sources-floating-button":
+      case "drjones.sources-panel-context":
+      case "ai-assistance.storage-floating-button":
+      case "ai-assistance.application-panel-context": {
+        void (async () => {
+          const view = UI9.ViewManager.ViewManager.instance().view(AiAssistancePanel.panelName);
+          if (!view) {
+            return;
+          }
+          await UI9.ViewManager.ViewManager.instance().showView(AiAssistancePanel.panelName);
+          const minDrawerSize = UI9.InspectorView.InspectorView.instance().totalSize() / 4;
+          if (UI9.InspectorView.InspectorView.instance().drawerSize() < minDrawerSize) {
+            UI9.InspectorView.InspectorView.instance().setDrawerSize(minDrawerSize);
+          }
+          const widget5 = await view.widget();
+          void widget5.handleAction(actionId, opts);
+        })();
+        return true;
+      }
+    }
+    return false;
+  }
+};
+function isAiAssistanceMultimodalUploadInputEnabled() {
+  return isAiAssistanceMultimodalInputEnabled() && Boolean(Root4.Runtime.hostConfig.devToolsFreestyler?.multimodalUploadInput);
+}
+function isAiAssistanceMultimodalInputEnabled() {
+  return Boolean(Root4.Runtime.hostConfig.devToolsFreestyler?.multimodal);
+}
+function isAiAssistanceServerSideLoggingEnabled() {
+  return !Root4.Runtime.hostConfig.aidaAvailability?.disallowLogging;
+}
+
+// gen/front_end/panels/ai_assistance/ExternalHandler.js
+var ExternalHandler_exports = {};
+__export(ExternalHandler_exports, {
+  getMatchingFlavorContext: () => getMatchingFlavorContext,
+  handleExternalAIRequest: () => handleExternalAIRequest
+});
+import * as Host6 from "../../core/host/host.js";
+import * as SDK7 from "../../core/sdk/sdk.js";
+import * as AiAssistanceModel9 from "../../models/ai_assistance/ai_assistance.js";
+import * as NetworkTimeCalculator from "../../models/network_time_calculator/network_time_calculator.js";
+import * as UI10 from "../../ui/legacy/legacy.js";
+function resolveConversationType(contextType) {
+  switch (contextType) {
+    case "NETWORK_REQUEST":
+      return "drjones-network-request";
+    default:
+      return "none";
+  }
+}
+function getMatchingFlavorContext(contextOptions) {
+  if (!contextOptions?.contextIdentifier) {
+    return null;
+  }
+  if (contextOptions.type === "NETWORK_REQUEST") {
+    const raw = UI10.Context.Context.instance().flavor(SDK7.NetworkRequest.NetworkRequest);
+    if (raw) {
+      if (raw.name() !== contextOptions.contextIdentifier && raw.url() !== contextOptions.contextIdentifier) {
+        return null;
+      }
+      return new AiAssistanceModel9.RequestContext.RequestContext(raw, new NetworkTimeCalculator.NetworkTransferTimeCalculator());
+    }
+  }
+  return null;
+}
+async function handleExternalAIRequest(options) {
+  localStorage.setItem("aiAssistanceStructuredLogEnabled", "true");
+  localStorage.removeItem("aiAssistanceStructuredLog");
+  const conversationType = resolveConversationType(options.context?.type);
+  const aidaClient = new Host6.AidaClient.AidaClient();
+  const conversation = new AiAssistanceModel9.AiConversation.AiConversation({
+    type: conversationType,
+    data: [],
+    isReadOnly: false,
+    aidaClient
+  });
+  const resolvedContext = getMatchingFlavorContext(options.context);
+  if (resolvedContext) {
+    conversation.setContext(resolvedContext);
+  }
+  for (const prompt of options.prompts) {
+    await Array.fromAsync(conversation.run(prompt));
+  }
+  const logsRaw = localStorage.getItem("aiAssistanceStructuredLog");
+  return logsRaw ? JSON.parse(logsRaw) : [];
+}
+globalThis.handleExternalAIRequest = handleExternalAIRequest;
+export {
+  AIv2MarkdownRenderer,
+  AccessibilityAgentMarkdownRenderer,
+  ActionDelegate,
+  AiAssistancePanel,
+  ChatInput_exports as ChatInput,
+  ChatMessage_exports as ChatMessage,
+  ChatView,
+  DisabledWidget_exports as DisabledWidget,
+  ExploreWidget_exports as ExploreWidget,
+  ExportConversation_exports as ExportConversation,
+  ExportForAgentsDialog_exports as ExportForAgentsDialog,
+  ExternalHandler_exports as ExternalHandler,
+  ImageResize_exports as ImageResize,
+  MarkdownRendererWithCodeBlock,
+  OptInChangeDialog_exports as OptInChangeDialog,
+  ViewState,
+  WalkthroughUtils_exports as WalkthroughUtils,
+  WalkthroughView_exports as WalkthroughView,
+  getResponseMarkdown
+};
+//# sourceMappingURL=ai_assistance.js.map

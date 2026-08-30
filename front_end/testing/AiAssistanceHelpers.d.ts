@@ -1,0 +1,137 @@
+import sinon from 'sinon';
+import * as Common from '../core/common/common.js';
+import * as Host from '../core/host/host.js';
+import * as Platform from '../core/platform/platform.js';
+import * as SDK from '../core/sdk/sdk.js';
+import * as AiAssistance from '../models/ai_assistance/ai_assistance.js';
+import * as Persistence from '../models/persistence/persistence.js';
+import type * as Trace from '../models/trace/trace.js';
+import * as Workspace from '../models/workspace/workspace.js';
+import * as AiAssistancePanel from '../panels/ai_assistance/ai_assistance.js';
+import * as UI from '../ui/legacy/legacy.js';
+import { type ViewFunctionStub } from './ViewFunctionHelpers.js';
+export declare const MockAidaAbortError: {
+    readonly abortError: true;
+};
+export declare const MockAidaFetchError: {
+    readonly fetchError: true;
+};
+export declare const MockAidaQuotaError: {
+    readonly quotaError: true;
+};
+export declare const MockAidaPayloadLimitError: {
+    readonly payloadLimitError: true;
+};
+export type MockAidaResponse = (Omit<Host.AidaClient.DoConversationResponse, 'completed' | 'metadata'> & {
+    metadata?: Host.AidaClient.ResponseMetadata;
+}) | typeof MockAidaAbortError | typeof MockAidaFetchError | typeof MockAidaQuotaError | typeof MockAidaPayloadLimitError;
+/**
+ * Creates a mock AIDA client that responds using `data`.
+ *
+ * Each first-level item of `data` is a single response.
+ * Each second-level item of `data` is a chunk of a response.
+ * The last chunk sets completed flag to true;
+ */
+export declare function mockAidaClient(data?: Array<[MockAidaResponse, ...MockAidaResponse[]]>): sinon.SinonStubbedInstance<Host.AidaClient.AidaClient>;
+export declare function createUISourceCode(options?: {
+    content?: string;
+    mimeType?: string;
+    url?: Platform.DevToolsPath.UrlString;
+    resourceType?: Common.ResourceType.ResourceType;
+    requestContentData?: boolean;
+}): Promise<Workspace.UISourceCode.UISourceCode>;
+export declare function createNetworkRequest(opts?: {
+    url?: Platform.DevToolsPath.UrlString;
+    includeInitiators?: boolean;
+    documentURL?: Platform.DevToolsPath.UrlString;
+}): SDK.NetworkRequest.NetworkRequest;
+/**
+ * Creates and shows an AiAssistancePanel instance returning the view
+ * stubs and the initial view input caused by Widget.show().
+ */
+export declare function createAiAssistancePanel(options?: {
+    aidaClient?: Host.AidaClient.AidaClient;
+    aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
+    chatView?: AiAssistancePanel.ChatView;
+}): Promise<{
+    panel: AiAssistancePanel.AiAssistancePanel;
+    view: ViewFunctionStub<typeof AiAssistancePanel.AiAssistancePanel>;
+    aidaClient: Host.AidaClient.AidaClient;
+    stubAidaCheckAccessPreconditions: (aidaAvailability: Host.AidaClient.AidaAccessPreconditions) => sinon.SinonStub<[], Promise<Host.AidaClient.AidaAccessPreconditions>>;
+}>;
+export declare const setupAutomaticFileSystem: (options?: {
+    hasFileSystem: boolean;
+}) => void;
+export declare function initializePersistenceImplForTests(): void;
+export declare function cleanup(): void;
+/**
+ * Removes the 'id' field from a message.
+ * Note: the return type is a distributive conditional type. This is required
+ * to ensure that Omit is applied to each member of the message union
+ * individually. Without this, Omit<Message, 'id'> would only preserve
+ * properties common to all members of the union, losing fields like 'text'
+ * (from UserChatMessage) or 'parts' (from ModelChatMessage).
+ */
+export declare function stripId<T extends {
+    id: string;
+}>(message: T): T extends AiAssistancePanel.ChatMessage.Message ? Omit<T, 'id'> : never;
+export declare function openHistoryContextMenu(lastUpdate: AiAssistancePanel.ViewInput, item: string): {
+    contextMenu: UI.ContextMenu.ContextMenu;
+    id: number | undefined;
+    entry: UI.ContextMenu.Item | undefined;
+};
+export declare function createTestFilesystem(fileSystemPath: string, files?: Array<{
+    path: string;
+    content: string;
+}>): {
+    project: Persistence.FileSystemWorkspaceBinding.FileSystem;
+    uiSourceCode: Workspace.UISourceCode.UISourceCode;
+};
+export declare function assertIsError<T>(response: AiAssistance.Tool.DataHandlerResult<T> | AiAssistance.Tool.ContextHandlerResult<T> | AiAssistance.AiAgent.ToolResult<T>): asserts response is AiAssistance.Tool.ToolErrorResult;
+export declare function assertIsResult<T>(response: AiAssistance.Tool.DataHandlerResult<T> | AiAssistance.Tool.ContextHandlerResult<T> | AiAssistance.AiAgent.ToolResult<T>): asserts response is AiAssistance.Tool.ToolDataResult<T>;
+export declare function assertRequiresApproval<T>(response: AiAssistance.Tool.DataHandlerResult<T> | AiAssistance.Tool.ContextHandlerResult<T> | AiAssistance.AiAgent.ToolResult<T>): asserts response is AiAssistance.Tool.ToolApprovalResult;
+export declare function assertIsContext<T>(response: AiAssistance.Tool.DataHandlerResult<T> | AiAssistance.Tool.ContextHandlerResult<T> | AiAssistance.AiAgent.ToolResult<T>): asserts response is AiAssistance.Tool.ToolContextResult<T>;
+/**
+ * Creates a dummy File object containing a solid red image with the given dimensions.
+ *
+ * @param width Width of the dummy image in pixels (px).
+ * @param height Height of the dummy image in pixels (px).
+ */
+export declare function createDummyImageFile(width: number, height: number): Promise<File>;
+export declare function makeFakeParsedTrace(options?: {
+    min?: number;
+    max?: number;
+    mainFrameURL?: string;
+}): Trace.TraceModel.ParsedTrace;
+export declare function stubPerformanceTraceFormatter(traceContext: AiAssistance.PerformanceTraceContext.PerformanceTraceContext, methods: {
+    formatMainThreadTrackSummary?: sinon.SinonStub;
+    formatNetworkTrackSummary?: sinon.SinonStub;
+    formatCallTree?: sinon.SinonStub;
+    resolveFunctionCodeAtLocation?: sinon.SinonStub;
+    formatFunctionCode?: sinon.SinonStub;
+}): sinon.SinonStub;
+/**
+ * Asserts that a skill is loaded/active by verifying that its full manifest entry
+ * (`- <name>: <description>`) is omitted from the prompt's unloaded skills manifest.
+ */
+export declare function assertSkillLoaded(prompt: string, skillName: AiAssistance.Skill.SkillName): void;
+/**
+ * Asserts that a skill is not loaded by verifying that its full manifest entry
+ * (`- <name>: <description>`) is present in the prompt's unloaded skills manifest.
+ */
+export declare function assertSkillNotLoaded(prompt: string, skillName: AiAssistance.Skill.SkillName): void;
+/**
+ * Consumes view updates sequentially until a side-effect confirmation dialog
+ * (`needs_approval` step state) appears in the message stream.
+ *
+ * @param view The view function stub representing the AI Assistance panel view.
+ * @returns The confirmation dialog handler to approve or decline the side effect.
+ */
+export declare function waitForSideEffectDialog(view: ViewFunctionStub<typeof AiAssistancePanel.AiAssistancePanel>): Promise<AiAssistancePanel.ChatMessage.ConfirmSideEffectDialog>;
+/**
+ * Consumes view updates sequentially until the conversation finishes loading.
+ *
+ * @param view The view function stub representing the AI Assistance panel view.
+ * @returns The final view input after loading has completed.
+ */
+export declare function waitForLoadingToFinish(view: ViewFunctionStub<typeof AiAssistancePanel.AiAssistancePanel>): Promise<AiAssistancePanel.ViewInput>;

@@ -1,0 +1,370 @@
+// ../../front_end/models/badges/AiExplorerBadge.ts
+import * as Common2 from "../../core/common/common.js";
+
+// ../../front_end/models/badges/Badge.ts
+import * as Common from "../../core/common/common.js";
+var BadgeAction = /* @__PURE__ */ ((BadgeAction2) => {
+  BadgeAction2["GDP_SIGN_UP_COMPLETE"] = "gdp-sign-up-complete";
+  BadgeAction2["RECEIVE_BADGES_SETTING_ENABLED"] = "receive-badges-setting-enabled";
+  BadgeAction2["CSS_RULE_MODIFIED"] = "css-rule-modified";
+  BadgeAction2["DOM_ELEMENT_OR_ATTRIBUTE_EDITED"] = "dom-element-or-attribute-edited";
+  BadgeAction2["MODERN_DOM_BADGE_CLICKED"] = "modern-dom-badge-clicked";
+  BadgeAction2["STARTED_AI_CONVERSATION"] = "started-ai-conversation";
+  BadgeAction2["PERFORMANCE_INSIGHT_CLICKED"] = "performance-insight-clicked";
+  BadgeAction2["DEBUGGER_PAUSED"] = "debugger-paused";
+  BadgeAction2["BREAKPOINT_ADDED"] = "breakpoint-added";
+  BadgeAction2["CONSOLE_PROMPT_EXECUTED"] = "console-prompt-executed";
+  BadgeAction2["PERFORMANCE_RECORDING_STARTED"] = "performance-recording-started";
+  BadgeAction2["NETWORK_SPEED_THROTTLED"] = "network-speed-throttled";
+  BadgeAction2["RECORDER_RECORDING_STARTED"] = "recorder-recording-started";
+  return BadgeAction2;
+})(BadgeAction || {});
+var Badge = class {
+  #onTriggerBadge;
+  #badgeActionEventTarget;
+  #eventListeners = [];
+  #triggeredBefore = false;
+  isStarterBadge = false;
+  constructor(context) {
+    this.#onTriggerBadge = context.onTriggerBadge;
+    this.#badgeActionEventTarget = context.badgeActionEventTarget;
+  }
+  trigger(opts) {
+    if (this.#triggeredBefore) {
+      return;
+    }
+    this.#triggeredBefore = true;
+    this.deactivate();
+    this.#onTriggerBadge(this, opts);
+  }
+  activate() {
+    if (this.#eventListeners.length > 0) {
+      return;
+    }
+    this.#eventListeners = this.interestedActions.map((actionType) => this.#badgeActionEventTarget.addEventListener(actionType, () => {
+      this.handleAction(actionType);
+    }, this));
+  }
+  deactivate() {
+    if (!this.#eventListeners.length) {
+      return;
+    }
+    Common.EventTarget.removeEventListeners(this.#eventListeners);
+    this.#eventListeners = [];
+    this.#triggeredBefore = false;
+  }
+};
+
+// ../../front_end/models/badges/AiExplorerBadge.ts
+var AI_EXPLORER_BADGE_URI = new URL("../../Images/ai-explorer-badge.svg", import.meta.url).toString();
+var AI_CONVERSATION_COUNT_SETTING_NAME = "gdp.ai-conversation-count";
+var AI_CONVERSATION_COUNT_LIMIT = 5;
+var AiExplorerBadge = class extends Badge {
+  name = "profiles/me/awards/developers.google.com%2Fprofile%2Fbadges%2Factivity%2Fchrome-devtools%2Fai-explorer";
+  title = "AI Explorer";
+  jslogContext = "ai-explorer";
+  imageUri = AI_EXPLORER_BADGE_URI;
+  #aiConversationCountSetting;
+  interestedActions = [
+    "started-ai-conversation" /* STARTED_AI_CONVERSATION */
+  ];
+  constructor(badgeContext) {
+    super(badgeContext);
+    this.#aiConversationCountSetting = badgeContext.settings.createSetting(
+      AI_CONVERSATION_COUNT_SETTING_NAME,
+      0,
+      Common2.Settings.SettingStorageType.SYNCED
+    );
+  }
+  handleAction(_action) {
+    const currentCount = this.#aiConversationCountSetting.get();
+    if (currentCount >= AI_CONVERSATION_COUNT_LIMIT) {
+      return;
+    }
+    this.#aiConversationCountSetting.set(currentCount + 1);
+    if (this.#aiConversationCountSetting.get() === AI_CONVERSATION_COUNT_LIMIT) {
+      this.trigger();
+    }
+  }
+};
+
+// ../../front_end/models/badges/SpeedsterBadge.ts
+var SPEEDSTER_BADGE_URI = new URL("../../Images/speedster-badge.svg", import.meta.url).toString();
+var SpeedsterBadge = class extends Badge {
+  name = "profiles/me/awards/developers.google.com%2Fprofile%2Fbadges%2Factivity%2Fchrome-devtools%2Fspeedster";
+  title = "Speedster";
+  jslogContext = "speedster";
+  interestedActions = [
+    "performance-insight-clicked" /* PERFORMANCE_INSIGHT_CLICKED */
+  ];
+  imageUri = SPEEDSTER_BADGE_URI;
+  handleAction(_action) {
+    this.trigger();
+  }
+};
+
+// ../../front_end/models/badges/StarterBadge.ts
+var STARTER_BADGE_IMAGE_URI = new URL("../../Images/devtools-user-badge.svg", import.meta.url).toString();
+var StarterBadge = class extends Badge {
+  isStarterBadge = true;
+  name = "profiles/me/awards/developers.google.com%2Fprofile%2Fbadges%2Factivity%2Fchrome-devtools%2Fchrome-devtools-user";
+  title = "Chrome DevTools User";
+  jslogContext = "chrome-devtools-user";
+  imageUri = STARTER_BADGE_IMAGE_URI;
+  // TODO(ergunsh): Add remaining non-trivial event definitions
+  interestedActions = [
+    "gdp-sign-up-complete" /* GDP_SIGN_UP_COMPLETE */,
+    "receive-badges-setting-enabled" /* RECEIVE_BADGES_SETTING_ENABLED */,
+    "css-rule-modified" /* CSS_RULE_MODIFIED */,
+    "dom-element-or-attribute-edited" /* DOM_ELEMENT_OR_ATTRIBUTE_EDITED */,
+    "breakpoint-added" /* BREAKPOINT_ADDED */,
+    "console-prompt-executed" /* CONSOLE_PROMPT_EXECUTED */,
+    "performance-recording-started" /* PERFORMANCE_RECORDING_STARTED */,
+    "network-speed-throttled" /* NETWORK_SPEED_THROTTLED */,
+    "recorder-recording-started" /* RECORDER_RECORDING_STARTED */
+  ];
+  handleAction(action) {
+    this.trigger({ immediate: action === "gdp-sign-up-complete" /* GDP_SIGN_UP_COMPLETE */ });
+  }
+};
+
+// ../../front_end/models/badges/UserBadges.ts
+import * as Common3 from "../../core/common/common.js";
+import * as Host from "../../core/host/host.js";
+import * as Root from "../../core/root/root.js";
+
+// ../../front_end/models/badges/CodeWhispererBadge.ts
+var CODE_WHISPERER_BADGE_IMAGE_URI = new URL("../../Images/code-whisperer-badge.svg", import.meta.url).toString();
+var CodeWhispererBadge = class extends Badge {
+  name = "profiles/me/awards/developers.google.com%2Fprofile%2Fbadges%2Factivity%2Fchrome-devtools%2Fcode-whisperer";
+  title = "Code Whisperer";
+  jslogContext = "code-whisperer";
+  imageUri = CODE_WHISPERER_BADGE_IMAGE_URI;
+  interestedActions = ["debugger-paused" /* DEBUGGER_PAUSED */];
+  handleAction(_action) {
+    this.trigger();
+  }
+};
+
+// ../../front_end/models/badges/DOMDetectiveBadge.ts
+var DOM_DETECTIVE_BADGE_IMAGE_URI = new URL("../../Images/dom-detective-badge.svg", import.meta.url).toString();
+var DOMDetectiveBadge = class extends Badge {
+  name = "profiles/me/awards/developers.google.com%2Fprofile%2Fbadges%2Factivity%2Fchrome-devtools%2Fdom-detective";
+  title = "DOM Detective";
+  jslogContext = "dom-detective";
+  imageUri = DOM_DETECTIVE_BADGE_IMAGE_URI;
+  interestedActions = [
+    "modern-dom-badge-clicked" /* MODERN_DOM_BADGE_CLICKED */
+  ];
+  handleAction(_action) {
+    this.trigger();
+  }
+};
+
+// ../../front_end/models/badges/UserBadges.ts
+var receiveGdpBadgesSettingDescriptor = {
+  name: "receive-gdp-badges",
+  type: Common3.Settings.SettingType.BOOLEAN,
+  defaultValue: false,
+  storageType: Common3.Settings.SettingStorageType.SYNCED
+};
+var BadgeTriggerReason = /* @__PURE__ */ ((BadgeTriggerReason2) => {
+  BadgeTriggerReason2["AWARD"] = "Award";
+  BadgeTriggerReason2["STARTER_BADGE_SETTINGS_NUDGE"] = "StarterBadgeSettingsNudge";
+  BadgeTriggerReason2["STARTER_BADGE_PROFILE_NUDGE"] = "StarterBadgeProfileNudge";
+  return BadgeTriggerReason2;
+})(BadgeTriggerReason || {});
+var Events = /* @__PURE__ */ ((Events2) => {
+  Events2["BADGE_TRIGGERED"] = "BadgeTriggered";
+  return Events2;
+})(Events || {});
+var SNOOZE_TIME_MS = 24 * 60 * 60 * 1e3;
+var MAX_SNOOZE_COUNT = 3;
+var DELAY_BEFORE_TRIGGER = 1500;
+var UserBadges = class _UserBadges extends Common3.ObjectWrapper.ObjectWrapper {
+  #badgeActionEventTarget = new Common3.ObjectWrapper.ObjectWrapper();
+  #receiveBadgesSetting;
+  #allBadges;
+  #starterBadgeSnoozeCount;
+  #starterBadgeLastSnoozedTimestamp;
+  #starterBadgeDismissed;
+  #settings;
+  #gdpClient;
+  #inspectorFrontendHost;
+  static BADGE_REGISTRY = [
+    StarterBadge,
+    SpeedsterBadge,
+    DOMDetectiveBadge,
+    CodeWhispererBadge,
+    AiExplorerBadge
+  ];
+  constructor(settings, gdpClient, inspectorFrontendHost) {
+    super();
+    this.#settings = settings;
+    this.#gdpClient = gdpClient;
+    this.#inspectorFrontendHost = inspectorFrontendHost;
+    this.#receiveBadgesSetting = this.#settings.resolve(receiveGdpBadgesSettingDescriptor);
+    if (!Host.GdpClient.isBadgesEnabled()) {
+      this.#receiveBadgesSetting.set(false);
+    }
+    this.#receiveBadgesSetting.addChangeListener(this.#reconcileBadges, this);
+    this.#starterBadgeSnoozeCount = this.#settings.createSetting("starter-badge-snooze-count", 0, Common3.Settings.SettingStorageType.SYNCED);
+    this.#starterBadgeLastSnoozedTimestamp = this.#settings.createSetting(
+      "starter-badge-last-snoozed-timestamp",
+      0,
+      Common3.Settings.SettingStorageType.SYNCED
+    );
+    this.#starterBadgeDismissed = this.#settings.createSetting("starter-badge-dismissed", false, Common3.Settings.SettingStorageType.SYNCED);
+    const badgeContext = {
+      onTriggerBadge: this.#onTriggerBadge.bind(this),
+      badgeActionEventTarget: this.#badgeActionEventTarget,
+      settings: this.#settings
+    };
+    this.#allBadges = _UserBadges.BADGE_REGISTRY.map((badgeCtor) => new badgeCtor(badgeContext));
+  }
+  static instance({ forceNew } = { forceNew: false }) {
+    if (!Root.DevToolsContext.globalInstance().has(_UserBadges) || forceNew) {
+      Root.DevToolsContext.globalInstance().set(
+        _UserBadges,
+        new _UserBadges(
+          // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+          Common3.Settings.Settings.instance(),
+          // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
+          Host.GdpClient.GdpClient.instance(),
+          Host.InspectorFrontendHost.InspectorFrontendHostInstance
+        )
+      );
+    }
+    return Root.DevToolsContext.globalInstance().get(_UserBadges);
+  }
+  async initialize() {
+    return await this.#reconcileBadges();
+  }
+  snoozeStarterBadge() {
+    this.#starterBadgeSnoozeCount.set(this.#starterBadgeSnoozeCount.get() + 1);
+    this.#starterBadgeLastSnoozedTimestamp.set(Date.now());
+  }
+  dismissStarterBadge() {
+    this.#starterBadgeDismissed.set(true);
+  }
+  recordAction(action) {
+    this.#badgeActionEventTarget.dispatchEventToListeners(action);
+  }
+  async #resolveBadgeTriggerReason(badge) {
+    if (!badge.isStarterBadge) {
+      return "Award" /* AWARD */;
+    }
+    const getProfileResponse = await this.#gdpClient.getProfile();
+    if (!getProfileResponse) {
+      return;
+    }
+    const hasGdpProfile = Boolean(getProfileResponse.profile);
+    const receiveBadgesSettingEnabled = Boolean(this.#receiveBadgesSetting.get());
+    if (hasGdpProfile && receiveBadgesSettingEnabled) {
+      return "Award" /* AWARD */;
+    }
+    if (this.#isStarterBadgeDismissed() || this.#isStarterBadgeSnoozed()) {
+      return;
+    }
+    if (hasGdpProfile && !receiveBadgesSettingEnabled) {
+      return "StarterBadgeSettingsNudge" /* STARTER_BADGE_SETTINGS_NUDGE */;
+    }
+    return "StarterBadgeProfileNudge" /* STARTER_BADGE_PROFILE_NUDGE */;
+  }
+  async #onTriggerBadge(badge, opts) {
+    const triggerTime = Date.now();
+    const reason = await this.#resolveBadgeTriggerReason(badge);
+    if (!reason) {
+      return;
+    }
+    if (reason === "Award" /* AWARD */) {
+      const result = await this.#gdpClient.createAward({ name: badge.name });
+      if (!result) {
+        return;
+      }
+    }
+    const timeElapsedAfterTriggerCall = Date.now() - triggerTime;
+    const delay = opts?.immediate ? 0 : Math.max(DELAY_BEFORE_TRIGGER - timeElapsedAfterTriggerCall, 0);
+    setTimeout(() => {
+      this.dispatchEventToListeners("BadgeTriggered" /* BADGE_TRIGGERED */, { badge, reason });
+    }, delay);
+  }
+  #deactivateAllBadges() {
+    this.#allBadges.forEach((badge) => {
+      badge.deactivate();
+    });
+  }
+  #isStarterBadgeDismissed() {
+    return this.#starterBadgeDismissed.get();
+  }
+  #isStarterBadgeSnoozed() {
+    const snoozeCount = this.#starterBadgeSnoozeCount.get();
+    const lastSnoozed = this.#starterBadgeLastSnoozedTimestamp.get();
+    const snoozedRecently = Date.now() - lastSnoozed < SNOOZE_TIME_MS;
+    return snoozeCount >= MAX_SNOOZE_COUNT || snoozedRecently;
+  }
+  async #reconcileBadges() {
+    const syncInfo = await new Promise(
+      (resolve) => this.#inspectorFrontendHost.getSyncInformation(resolve)
+    );
+    if (!syncInfo.accountEmail) {
+      this.#deactivateAllBadges();
+      return;
+    }
+    if (!Host.GdpClient.isGdpProfilesAvailable() || !Host.GdpClient.isBadgesEnabled()) {
+      this.#deactivateAllBadges();
+      return;
+    }
+    const getProfileResponse = await this.#gdpClient.getProfile();
+    if (!getProfileResponse) {
+      this.#deactivateAllBadges();
+      return;
+    }
+    const hasGdpProfile = Boolean(getProfileResponse.profile);
+    const isEligibleToCreateProfile = getProfileResponse.isEligible;
+    if (!hasGdpProfile && !isEligibleToCreateProfile) {
+      this.#deactivateAllBadges();
+      return;
+    }
+    let awardedBadgeNames = null;
+    if (hasGdpProfile) {
+      awardedBadgeNames = await this.#gdpClient.getAwardedBadgeNames({ names: this.#allBadges.map((badge) => badge.name) });
+      if (!awardedBadgeNames) {
+        this.#deactivateAllBadges();
+        return;
+      }
+    }
+    const receiveBadgesSettingEnabled = Boolean(this.#receiveBadgesSetting.get());
+    for (const badge of this.#allBadges) {
+      if (awardedBadgeNames?.has(badge.name)) {
+        badge.deactivate();
+        continue;
+      }
+      const shouldActivateStarterBadge = badge.isStarterBadge && isEligibleToCreateProfile && Host.GdpClient.isStarterBadgeEnabled() && !this.#isStarterBadgeDismissed() && !this.#isStarterBadgeSnoozed();
+      const shouldActivateActivityBasedBadge = !badge.isStarterBadge && hasGdpProfile && receiveBadgesSettingEnabled;
+      if (shouldActivateStarterBadge || shouldActivateActivityBasedBadge) {
+        badge.activate();
+      } else {
+        badge.deactivate();
+      }
+    }
+    this.reconcileBadgesFinishedForTest();
+  }
+  reconcileBadgesFinishedForTest() {
+  }
+  isReceiveBadgesSettingEnabled() {
+    return Boolean(this.#receiveBadgesSetting.get());
+  }
+};
+export {
+  AiExplorerBadge,
+  Badge,
+  BadgeAction,
+  BadgeTriggerReason,
+  Events,
+  SpeedsterBadge,
+  StarterBadge,
+  UserBadges,
+  receiveGdpBadgesSettingDescriptor
+};
+//# sourceMappingURL=badges.js.map

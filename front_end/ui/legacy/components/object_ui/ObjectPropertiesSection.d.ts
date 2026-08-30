@@ -1,0 +1,309 @@
+import * as Common from '../../../../core/common/common.js';
+import * as SDK from '../../../../core/sdk/sdk.js';
+import * as TextUtils from '../../../../core/text_utils/text_utils.js';
+import type * as Protocol from '../../../../generated/protocol.js';
+import { type DirectiveResult, type LitTemplate, type TemplateResult } from '../../../lit/lit.js';
+import * as UI from '../../legacy.js';
+import type * as Components from '../utils/utils.js';
+import objectPropertiesSectionStyles from './objectPropertiesSection.css.js';
+import objectValueStyles from './objectValue.css.js';
+export { objectPropertiesSectionStyles, objectValueStyles };
+export interface ObjectPropertySearchResult extends UI.TreeOutline.TreeSearchResult<ObjectTreeNodeBase> {
+    matchType: 'name' | 'value';
+    range: TextUtils.TextRange.SourceRange;
+}
+export declare const EXPANDABLE_MAX_DEPTH = 100;
+interface NodeChildren {
+    properties?: ObjectTreeNode[];
+    internalProperties?: ObjectTreeNode[];
+    arrayRanges?: ArrayGroupTreeNode[];
+    accessors?: ObjectTreeNode[];
+}
+export interface ObjectTreeOptions {
+    readonly propertiesMode: ObjectPropertiesMode;
+    readonly readOnly: boolean;
+    readonly expansionTracker?: ObjectTreeExpansionTracker;
+    readonly search?: UI.TreeOutline.TreeSearch<ObjectTreeNodeBase>;
+}
+export declare function isWasmObject(object: SDK.RemoteObject.RemoteObject | undefined): boolean;
+export declare class ObjectTreeExpansionTracker {
+    #private;
+    clear(): void;
+    apply(node: ObjectTree): Promise<void>;
+    collapse(node: ObjectTreeNodeBase): void;
+    expand(node: ObjectTreeNodeBase): void;
+}
+export declare abstract class ObjectTreeNodeBase extends Common.ObjectWrapper.ObjectWrapper<ObjectTreeNodeBase.EventTypes> {
+    #private;
+    readonly parent: ObjectTreeNodeBase | undefined;
+    protected readonly options: ObjectTreeOptions;
+    protected filter: {
+        includeNullOrUndefinedValues: boolean;
+        regex: RegExp | null;
+    } | null;
+    protected extraProperties: ObjectTreeNode[];
+    constructor(parent: ObjectTreeNodeBase | undefined, options: ObjectTreeOptions);
+    get isWasm(): boolean;
+    get expanded(): boolean;
+    set expanded(val: boolean);
+    get readOnly(): boolean;
+    get propertiesMode(): ObjectPropertiesMode;
+    get search(): UI.TreeOutline.TreeSearch<ObjectTreeNodeBase> | undefined;
+    get includeNullOrUndefinedValues(): boolean;
+    set includeNullOrUndefinedValues(value: boolean);
+    get canExpandRecursively(): boolean;
+    get sortPropertiesAlphabetically(): boolean;
+    set sortPropertiesAlphabetically(value: boolean);
+    treeNodeChildren(): Generator<ObjectTreeNodeBase>;
+    expandRecursively(maxDepth: number): Promise<void>;
+    collapseRecursively(): void;
+    setFilter(filter: {
+        includeNullOrUndefinedValues: boolean;
+        regex: RegExp | null;
+    } | null): void;
+    abstract get object(): SDK.RemoteObject.RemoteObject | undefined;
+    removeChildren(): void;
+    match(_regex: RegExp): ObjectPropertySearchResult[];
+    removeChild(child: ObjectTreeNodeBase): void;
+    protected selfOrParentIfInternal(): ObjectTreeNodeBase;
+    get children(): NodeChildren | undefined;
+    populateChildrenIfNeeded(): Promise<NodeChildren>;
+    protected populateChildrenIfNeededImpl(): Promise<NodeChildren>;
+    get hasChildren(): boolean;
+    get arrayLength(): number;
+    setPropertyValue(name: string | Protocol.Runtime.CallArgument, value: string): Promise<string | undefined>;
+    addExtraProperties(...properties: SDK.RemoteObject.RemoteObjectProperty[]): void;
+    static getGettersAndSetters(properties: ObjectTreeNode[], options: ObjectTreeOptions): ObjectTreeNode[];
+}
+export declare namespace ObjectTreeNodeBase {
+    const enum Events {
+        VALUE_CHANGED = "value-changed",
+        CHILDREN_CHANGED = "children-changed",
+        FILTER_CHANGED = "filter-changed",
+        EXPANDED_CHANGED = "expanded-changed"
+    }
+    interface EventTypes {
+        [Events.VALUE_CHANGED]: void;
+        [Events.CHILDREN_CHANGED]: void;
+        [Events.FILTER_CHANGED]: void;
+        [Events.EXPANDED_CHANGED]: boolean;
+    }
+}
+export declare class ObjectTree extends ObjectTreeNodeBase {
+    #private;
+    constructor(object: SDK.RemoteObject.RemoteObject, options: ObjectTreeOptions);
+    get object(): SDK.RemoteObject.RemoteObject;
+}
+interface ArrayGroupRange {
+    fromIndex: number;
+    toIndex: number;
+    count: number;
+}
+export declare class ArrayGroupTreeNode extends ObjectTreeNodeBase {
+    #private;
+    constructor(object: SDK.RemoteObject.RemoteObject, range: ArrayGroupRange, parent: ObjectTreeNodeBase, options: ObjectTreeOptions);
+    populateChildrenIfNeededImpl(): Promise<NodeChildren>;
+    get singular(): boolean;
+    get range(): ArrayGroupRange;
+    get object(): SDK.RemoteObject.RemoteObject;
+}
+export declare class ObjectTreeNode extends ObjectTreeNodeBase {
+    #private;
+    readonly property: SDK.RemoteObject.RemoteObjectProperty;
+    readonly nonSyntheticParent?: SDK.RemoteObject.RemoteObject | undefined;
+    constructor(property: SDK.RemoteObject.RemoteObjectProperty, parent: ObjectTreeNodeBase | undefined, options: ObjectTreeOptions, nonSyntheticParent?: SDK.RemoteObject.RemoteObject | undefined);
+    get object(): SDK.RemoteObject.RemoteObject | undefined;
+    get isFiltered(): boolean;
+    get canExpandRecursively(): boolean;
+    get name(): string;
+    get path(): string;
+    selfOrParentIfInternal(): ObjectTreeNodeBase;
+    setValue(expression: string): Promise<void>;
+    invokeGetter(getter: SDK.RemoteObject.RemoteObject): Promise<void>;
+    match(regex: RegExp): ObjectPropertySearchResult[];
+}
+export declare function compareProperties(propertyA: ObjectTreeNode | SDK.RemoteObject.RemoteObjectProperty, propertyB: ObjectTreeNode | SDK.RemoteObject.RemoteObjectProperty, sortPropertiesAlphabetically?: boolean): number;
+export declare function valueElementForFunctionDescription(description?: string, includePreview?: boolean, defaultName?: string, details?: SDK.DebuggerModel.FunctionDetails | null, linkify?: boolean): LitTemplate;
+export declare function getMemoryIcon(object: SDK.RemoteObject.RemoteObject, expression?: string): LitTemplate;
+export declare class ObjectPropertiesSectionWidget extends UI.Widget.Widget {
+    #private;
+    constructor(element?: HTMLElement, view?: ObjectPropertiesSectionView);
+    get root(): SDK.RemoteObject.RemoteObject | undefined;
+    set root(val: SDK.RemoteObject.RemoteObject);
+    get objectTree(): ObjectTree | undefined;
+    set objectTree(val: ObjectTree | undefined);
+    get title(): Element | TemplateResult | undefined;
+    set title(val: Element | TemplateResult | undefined);
+    get skipProto(): boolean;
+    set skipProto(val: boolean);
+    get linkifier(): Components.Linkifier.Linkifier | undefined;
+    set linkifier(val: Components.Linkifier.Linkifier);
+    get showOverflow(): boolean;
+    set showOverflow(val: boolean);
+    onExpand: (expanded: boolean) => void;
+    performUpdate(): void;
+    onDetach(): void;
+    wasShown(): void;
+    private onRootItemContextMenu;
+}
+export interface TreeOutlineOptions {
+    readOnly?: boolean;
+}
+export declare class ObjectPropertiesSectionsTreeOutline extends UI.TreeOutline.TreeOutlineInShadow {
+    constructor();
+}
+export declare const enum ObjectPropertiesMode {
+    ALL = 0,// All properties, including prototype properties
+    OWN_AND_INTERNAL_AND_INHERITED = 1
+}
+export declare function populateObjectTreeContextMenu(contextMenu: UI.ContextMenu.ContextMenu, object: ObjectTree, expandRecursively: () => void, collapseChildren: () => void, sortPropertiesAlphabetically: () => void, onShowAllToggled: () => void): void;
+interface ObjectTreeViewInput {
+    renderAsSubtree: boolean;
+    objectTree?: ObjectTree;
+    linkifier?: Components.Linkifier.Linkifier;
+    emptyPlaceholder?: string;
+    skipProto: boolean;
+    onExpand: (expanded: boolean) => void;
+}
+type ObjectTreeView = (input: ObjectTreeViewInput, output: object, target: HTMLElement) => void;
+export declare const OBJECT_TREE_DEFAULT_VIEW: ObjectTreeView;
+export declare class ObjectTreeWidget extends UI.Widget.Widget {
+    #private;
+    constructor(element?: HTMLElement, view?: ObjectTreeView);
+    onExpand: (expanded: boolean) => void;
+    get skipProto(): boolean;
+    set skipProto(val: boolean);
+    get objectTree(): ObjectTree | undefined;
+    set objectTree(val: ObjectTree);
+    get linkifier(): Components.Linkifier.Linkifier | undefined;
+    set linkifier(val: Components.Linkifier.Linkifier);
+    get emptyPlaceholder(): string | undefined;
+    set emptyPlaceholder(val: string);
+    get renderAsSubtree(): boolean;
+    set renderAsSubtree(val: boolean);
+    performUpdate(): Promise<void>;
+    onDetach(): void;
+    wasShown(): void;
+}
+export declare function renderObjectTree(objectTree: ObjectTree, linkifier?: Components.Linkifier.Linkifier, emptyPlaceholder?: string): LitTemplate | DirectiveResult;
+export interface ObjectPropertiesSectionViewInput {
+    objectTree: ObjectTree;
+    title?: Element | TemplateResult;
+    linkifier?: Components.Linkifier.Linkifier;
+    skipProto: boolean;
+    showOverflow: boolean;
+    onRootItemContextMenu: (menu: UI.ContextMenu.ContextMenu) => void;
+    onExpand: (expanded: boolean) => void;
+}
+export type ObjectPropertiesSectionView = (input: ObjectPropertiesSectionViewInput, output: object, target: HTMLElement) => void;
+export declare const OBJECT_PROPERTIES_SECTION_DEFAULT_VIEW: ObjectPropertiesSectionView;
+export declare function renderPropertyName(name: string | null, isPrivate?: boolean, title?: string): TemplateResult;
+export declare function formatObjectAsFunction(func: SDK.RemoteObject.RemoteObject, linkify: boolean, includePreview?: boolean): Promise<LitTemplate>;
+export declare function renderPropertyValue(value: SDK.RemoteObject.RemoteObject, wasThrown: boolean, showPreview: boolean, linkifier?: Components.Linkifier.Linkifier, isSyntheticProperty?: boolean, variableName?: string, includeNullOrUndefined?: boolean, useCustomPreview?: boolean, valueRef?: (element: Element | undefined) => void): LitTemplate;
+export declare function defaultObjectPresentation(objectOrTree: SDK.RemoteObject.RemoteObject | ObjectTree, linkifier?: Components.Linkifier.Linkifier, skipProto?: boolean, readOnly?: boolean): LitTemplate;
+/**
+ * Number of initially visible children in an ObjectPropertyTreeElement.
+ * Remaining children are shown as soon as requested via a show more properties button.
+ **/
+export declare const InitialVisibleChildrenLimit = 200;
+export interface ObjectPropertyViewInput {
+    editable: boolean;
+    startEditing(): unknown;
+    invokeGetter(getter: SDK.RemoteObject.RemoteObject): unknown;
+    onAutoComplete(expression: string, filter: string, force: boolean): unknown;
+    linkifier: Components.Linkifier.Linkifier | undefined;
+    completions: string[];
+    expanded: boolean;
+    editing: boolean;
+    editingEnded(): unknown;
+    editingCommitted(detail: string): unknown;
+    node: ObjectTreeNode;
+    search?: UI.TreeOutline.TreeSearch<ObjectTreeNodeBase>;
+}
+interface ObjectPropertyViewOutput {
+    valueElement: Element | undefined;
+    nameElement: Element | undefined;
+}
+type ObjectPropertyView = (input: ObjectPropertyViewInput, output: ObjectPropertyViewOutput, target: HTMLElement) => void;
+export declare const OBJECT_PROPERTY_DEFAULT_VIEW: ObjectPropertyView;
+export declare class ObjectPropertyWidget extends UI.Widget.Widget {
+    #private;
+    constructor(target?: HTMLElement, view?: ObjectPropertyView);
+    get property(): ObjectTreeNode | undefined;
+    set property(property: ObjectTreeNode);
+    get expanded(): boolean;
+    set expanded(expanded: boolean);
+    get linkifier(): Components.Linkifier.Linkifier | undefined;
+    set linkifier(linkifier: Components.Linkifier.Linkifier | undefined);
+    get editable(): boolean;
+    set editable(val: boolean);
+    performUpdate(): void;
+    setSearchRegex(regex: RegExp, additionalCssClassName?: string): boolean;
+    revertHighlightChanges(): void;
+    get editing(): boolean;
+    startEditing(): void;
+}
+export declare class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
+    #private;
+    property: ObjectTreeNode;
+    toggleOnClick: boolean;
+    private linkifier;
+    private readonly maxNumPropertiesToShow;
+    constructor(property: ObjectTreeNode, linkifier?: Components.Linkifier.Linkifier);
+    static populate(treeElement: UI.TreeOutline.TreeElement, value: ObjectTreeNodeBase, skipProto: boolean, skipGettersAndSetters: boolean, linkifier?: Components.Linkifier.Linkifier, emptyPlaceholder?: string | null): Promise<void>;
+    static populateChildrenIfNeeded(value: ObjectTreeNodeBase): Promise<void>;
+    static populateImpl(treeElement: UI.TreeOutline.TreeElement, value: ObjectTreeNodeBase, skipProto: boolean, skipGettersAndSetters: boolean, linkifier?: Components.Linkifier.Linkifier, emptyPlaceholder?: string | null): void;
+    static createNodes(value: ObjectTreeNodeBase, skipProto: boolean, skipGettersAndSetters: boolean, linkifier?: Components.Linkifier.Linkifier, emptyPlaceholder?: string | null, isNotDisplayablePropertyCallback?: (property: SDK.RemoteObject.RemoteObjectProperty) => boolean): Generator<UI.TreeOutline.TreeElement>;
+    static createPropertyNodes({ properties, internalProperties, accessors, arrayRanges }: NodeChildren, skipProto: boolean, skipGettersAndSetters: boolean, linkifier?: Components.Linkifier.Linkifier, emptyPlaceholder?: string | null, isNotDisplayablePropertyCallback?: (property: SDK.RemoteObject.RemoteObjectProperty) => boolean): Generator<UI.TreeOutline.TreeElement>;
+    static populateWithProperties(treeNode: UI.TreeOutline.TreeElement, children: NodeChildren, skipProto: boolean, skipGettersAndSetters: boolean, linkifier?: Components.Linkifier.Linkifier, emptyPlaceholder?: string | null): void;
+    revertHighlightChanges(): void;
+    setSearchRegex(regex: RegExp, additionalCssClassName?: string): boolean;
+    startEditing(): void;
+    get editing(): boolean;
+    get editable(): boolean;
+    set editable(val: boolean);
+    applyExpression(expression: string): Promise<void>;
+    private showAllPropertiesElementSelected;
+    private createShowAllPropertiesButton;
+    onpopulate(): Promise<void>;
+    onattach(): void;
+    onexpand(): void;
+    oncollapse(): void;
+    getContextMenu(event: Event): UI.ContextMenu.ContextMenu;
+    private contextMenuFired;
+    private updateExpandable;
+    path(): string;
+}
+export declare class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
+    #private;
+    toggleOnClick: boolean;
+    private readonly linkifier;
+    constructor(child: ArrayGroupTreeNode, linkifier?: Components.Linkifier.Linkifier);
+    static createNodes(children: NodeChildren, linkifier?: Components.Linkifier.Linkifier, isNotDisplayablePropertyCallback?: (property: SDK.RemoteObject.RemoteObjectProperty) => boolean): Generator<UI.TreeOutline.TreeElement>;
+    static populateChildrenIfNeeded(children: NodeChildren): Promise<void>;
+    onexpand(): void;
+    oncollapse(): void;
+    onpopulate(): Promise<void>;
+    onattach(): void;
+    static bucketThreshold: number;
+    static sparseIterationThreshold: number;
+}
+interface ExpandableTextViewInput {
+    copyText: () => void;
+    expandText: () => void;
+    expanded: boolean;
+    maxLength: number;
+    byteCount: number;
+    text: string;
+}
+type ExpandableTextView = (input: ExpandableTextViewInput, output: object, target: HTMLElement) => void;
+export declare const EXPANDABLE_TEXT_DEFAULT_VIEW: ExpandableTextView;
+export declare class ExpandableTextPropertyValue extends UI.Widget.Widget {
+    #private;
+    static readonly MAX_DISPLAYABLE_TEXT_LENGTH = 10000000;
+    static readonly EXPANDABLE_MAX_LENGTH = 50;
+    constructor(target?: HTMLElement, view?: ExpandableTextView);
+    set text(text: string);
+    set maxLength(maxLength: number);
+    performUpdate(): void;
+}

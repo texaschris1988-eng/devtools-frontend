@@ -1,0 +1,72 @@
+var __defProp = Object.defineProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+
+// ../../front_end/models/comment_manager/CommentManager.ts
+var CommentManager_exports = {};
+__export(CommentManager_exports, {
+  CommentManager: () => CommentManager,
+  Events: () => Events
+});
+import * as Common from "../../core/common/common.js";
+var Events = /* @__PURE__ */ ((Events2) => {
+  Events2["COMMENT_THREADS_CHANGED"] = "CommentThreadsChanged";
+  Events2["COMMENT_MODE_CHANGED"] = "CommentModeChanged";
+  return Events2;
+})(Events || {});
+var CommentManager = class extends Common.ObjectWrapper.ObjectWrapper {
+  #commentThreads = /* @__PURE__ */ new Map();
+  #commentMode = false;
+  #nextId = 1;
+  setCommentMode(active) {
+    if (this.#commentMode === active) {
+      return;
+    }
+    this.#commentMode = active;
+    this.dispatchEventToListeners("CommentModeChanged" /* COMMENT_MODE_CHANGED */, active);
+  }
+  isCommentMode() {
+    return this.#commentMode;
+  }
+  createCommentThread(anchor, text, author = "DEVELOPER", changes) {
+    const id = `comment-${this.#nextId++}`;
+    const thread = {
+      id,
+      anchor,
+      comments: [{
+        author,
+        text,
+        timestamp: Date.now()
+      }],
+      status: "ACTIVE",
+      changes
+    };
+    this.#commentThreads.set(id, thread);
+    this.dispatchEventToListeners("CommentThreadsChanged" /* COMMENT_THREADS_CHANGED */, this.getCommentThreads());
+    return thread;
+  }
+  getCommentThread(id) {
+    return this.#commentThreads.get(id);
+  }
+  getCommentThreads() {
+    return Array.from(this.#commentThreads.values());
+  }
+  removeCommentThread(id) {
+    if (!this.#commentThreads.has(id)) {
+      return;
+    }
+    this.#commentThreads.delete(id);
+    this.dispatchEventToListeners("CommentThreadsChanged" /* COMMENT_THREADS_CHANGED */, this.getCommentThreads());
+  }
+  clear() {
+    this.setCommentMode(false);
+    this.#commentThreads.clear();
+    this.dispatchEventToListeners("CommentThreadsChanged" /* COMMENT_THREADS_CHANGED */, []);
+  }
+};
+export {
+  CommentManager_exports as CommentManager
+};
+//# sourceMappingURL=comment_manager.js.map
